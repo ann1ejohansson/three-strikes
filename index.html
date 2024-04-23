@@ -6,42 +6,70 @@
   <style>
     body {
       font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
     }
-    .center {
-      text-align: center;
+    .banner {
+      background-color: #f0f0f0;
+      width: 200px;
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .main {
+      margin-left: 220px;
+      padding: 20px;
+    }
+    h1 {
+      margin-top: 0;
+    }
+    section {
+      margin-bottom: 20px;
     }
   </style>
 </head>
 <body>
 
-<!-- Title -->
-<h1 class="center"><strong>Three Strikes and Who is Out? Individual Differences in Error-Induced Quitting</strong></h1>
-
-<!-- Author -->
-<p class="center"><a href="https://www.uva.nl/profiel/j/o/a.m.johansson/a.m.johansson.html">Annie Johansson</a></p>
-
-<!-- Affiliation -->
-<p class="center">University of Amsterdam</p>
-
-<!-- Links -->
-<div class="center">
-  <a href="path/to/your_paper.pdf" target="_blank">PDF</a>
-  <a href="path/to/supplementary_materials.pdf" target="_blank">Supplementary materials</a>
-  <a href="./another-page.html">Code</a>
+<!-- Column banner -->
+<div class="banner">
+  <!-- Title -->
+  <h1><strong>Three Strikes and Who is Out? Individual Differences in Error-Induced Quitting</strong></h1>
+  
+  <!-- Author -->
+  <p><a href="https://www.uva.nl/profiel/j/o/a.m.johansson/a.m.johansson.html">Annie Johansson</a></p>
+  
+  <!-- Affiliation -->
+  <p>University of Amsterdam</p>
+  
+  <!-- Links -->
+  <div>
+    <a href="path/to/your_paper.pdf" target="_blank">PDF</a><br>
+    <a href="path/to/supplementary_materials.pdf" target="_blank">Supplementary materials</a><br>
+    <a href="./another-page.html">Code</a>
+  </div>
 </div>
 
-<!-- Abstract -->
-<section>
-  <h2>Abstract</h2>
-  <p>Insert abstract of your paper here.</p>
-</section>
+<!-- Main content -->
+<div class="main">
 
-<!-- Figures -->
-<section>
-  <h2>Figures</h2>
-  <!-- You can add image elements here -->
-  <!-- Example: <img src="path/to/your_image.jpg" alt="Figure 1"> -->
-</section>
+  <!-- Abstract -->
+  <section>
+    <h2>Abstract</h2>
+    <p>Insert abstract of your paper here.</p>
+  </section>
+
+  <!-- Figures -->
+  <section>
+    <h2>Figures</h2>
+    <!-- You can add image elements here -->
+    <!-- Example: <img src="path/to/your_image.jpg" alt="Figure 1"> -->
+  </section>
+
+</div>
 
 </body>
 </html>
+
