@@ -77,7 +77,7 @@
 }
 
 .button:hover {
-  background-color: #ff846e; /* New background color when hovered */
+  background-color: #ffc6bc; /* New background color when hovered */
   color: #ff5233; /* New text color when hovered */
 }
 
