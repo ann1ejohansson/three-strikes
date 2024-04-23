@@ -17,16 +17,11 @@ body {
 
 /* Title styles */
 h1 {
-  text-align: left; /* center title */
+  text-align: center; /* center title */
   font-family: "Work Sans", "Arial", sans-serif; /* monospace font for titles */
   font-size: 45px;
-  color: #5a5a5a;
-  background-color: #f9f9f9
-}
-
-h1.work-sans-light {
-  font-family: "Work Sans", sans-serif;
   font-weight: 200;
+  color: #5a5a5a;
 }
 
 h2 {
@@ -43,7 +38,12 @@ p {
 
 /* Links styles */
 a {
-  text-decoration: none; /* remove underline from links */
+  text-decoration: underline; /* Add underline to links */
+  color: #5a5a5a; /* Change link color  */
+}
+
+a:hover {
+  color: #b2412d; /* Change link color on hover */
 }
 
 /* Button styles */
