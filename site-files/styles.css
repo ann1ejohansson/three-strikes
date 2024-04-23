@@ -1,5 +1,9 @@
 /* styles.css */
 
+background {
+  background-color:#fdfaf5
+}
+
 /* Body styles */
 body {
   font-family: "Roboto", "Arial", sans-serif;
@@ -11,9 +15,16 @@ body {
 /* Title styles */
 h1 {
   text-align: left; /* center title */
-  font-family: "Helvetica", "Arial", sans-serif; /* monospace font for titles */
+  font-family: "Roboto", "Arial", sans-serif; /* monospace font for titles */
   font-size: 45px
   color: #5a5a5a
+}
+
+h2 {
+  text-align: left; /* center title */
+  font-family: "Roboto", "Arial", sans-serif; /* monospace font for titles */
+  font-size: 32px
+  color: #b2412d
 }
 
 /* Paragraph styles */
