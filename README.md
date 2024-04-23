@@ -5,4 +5,5 @@
 
 <p style="text=align: center;">Project completed [DATE]  </p>
 
+[Link to another page](./test.html).
 
