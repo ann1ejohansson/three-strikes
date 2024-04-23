@@ -6,25 +6,11 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 0;
+      margin: 20px; /* smaller margins */
       padding: 0;
     }
-    .banner {
-      background-color: #f0f0f0;
-      width: 200px;
-      position: fixed;
-      top: 0;
-      bottom: 0;
-      left: 0;
-      padding: 20px;
-      overflow-y: auto;
-    }
-    .main {
-      margin-left: 220px;
-      padding: 20px;
-    }
     h1 {
-      margin-top: 0;
+      text-align: center; /* center title */
     }
     section {
       margin-bottom: 20px;
@@ -37,7 +23,7 @@
       text-align: center;
       text-decoration: none;
       font-size: 16px;
-      margin: 4px 2px;
+      margin: 4px; /* smaller button margins */
       cursor: pointer;
       border-radius: 8px;
     }
@@ -45,44 +31,36 @@
 </head>
 <body>
 
-<!-- Column banner -->
-<div class="banner">
-  <!-- Title -->
-  <h1><strong>Three Strikes and Who is Out? Individual Differences in Error-Induced Quitting</strong></h1>
-  
-  <!-- Author -->
-  <p><a href="https://www.uva.nl/profiel/j/o/a.m.johansson/a.m.johansson.html">Annie Johansson</a></p>
-  
-  <!-- Affiliation -->
-  <p>University of Amsterdam</p>
-  
-  <!-- Links -->
-  <div>
-    <a class="button" href="path/to/your_paper.pdf" target="_blank">PDF</a><br>
-    <a class="button" href="path/to/supplementary_materials.pdf" target="_blank">Supplementary materials</a><br>
-    <a class="button" href="./another-page.html">Code</a>
-  </div>
+<!-- Title -->
+<h1><strong>Three Strikes and Who is Out? Individual Differences in Error-Induced Quitting</strong></h1>
+
+<!-- Author -->
+<p style="text-align: center;"><a href="https://www.uva.nl/profiel/j/o/a.m.johansson/a.m.johansson.html">Annie Johansson</a></p>
+
+<!-- Affiliation -->
+<p style="text-align: center;">University of Amsterdam</p>
+
+<!-- Links -->
+<div style="text-align: center;">
+  <a class="button" href="path/to/your_paper.pdf" target="_blank">PDF</a>
+  <a class="button" href="path/to/supplementary_materials.pdf" target="_blank">Supplementary materials</a>
+  <a class="button" href="./another-page.html">Code</a>
 </div>
 
-<!-- Main content -->
-<div class="main">
+<!-- Abstract -->
+<section>
+  <h2 style="text-align: center;">Abstract</h2>
+  <p>The biggest threat to learning is not learning. Crucially, sequential errors have been found to be an important cause of quitting from learning. However, little is known about how students are differently affected by sequential errors. Here, we investigate the underlying factors. Using intensive longitudinal practicing data from over $200000$ primary-school students in a large-scale Online Learning Environment (OLE), we confirm previous findings that sequential errors strongly increase the probability of quitting from learning. Second, we find large variability in this effect, ranging from no or small tendencies to quit to high sensitivities to quitting following sequential errors. We validate these results in an independent dataset, and show that individual differences are stable across two across two arithmetic practice domains. Our results corroborate the theoretical notion that students differ in their tolerance to failure and pinpoint a need to individualize how computer-adaptive systems intervene after errors. 
+.</p>
+</section>
 
-  <!-- Abstract -->
-  <section>
-    <h2>Abstract</h2>
-    <p>Insert abstract of your paper here.</p>
-  </section>
-
-  <!-- Figures -->
-  <section>
-    <h2>Figures</h2>
-    <!-- You can add image elements here -->
-    <!-- Example: <img src="path/to/your_image.jpg" alt="Figure 1"> -->
-  </section>
-
-</div>
+<!-- Figures -->
+<section>
+  <h2 style="text-align: center;">Figures</h2>
+  <!-- You can add image elements here -->
+  <!-- Example: <img src="path/to/your_image.jpg" alt="Figure 1"> -->
+</section>
 
 </body>
 </html>
-
 
