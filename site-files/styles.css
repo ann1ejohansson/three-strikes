@@ -1,7 +1,9 @@
 /* styles.css */
 
-background {
-  background-color:#fdfaf5;
+/* Font weight for Work Sans */
+.work-sans-light {
+  font-family: "Work Sans", sans-serif;
+  font-weight: 200;
 }
 
 /* Body styles */
@@ -9,7 +11,8 @@ body {
   font-family: "Roboto", "Arial", sans-serif;
   margin: 40px; /* increased margins */
   padding: 40px;
-  color: #404040
+  color: #404040;
+  background-color: #fdfaf5; /* #f9f9f9 */
 }
 
 /* Title styles */
@@ -17,12 +20,18 @@ h1 {
   text-align: left; /* center title */
   font-family: "Work Sans", "Arial", sans-serif; /* monospace font for titles */
   font-size: 45px;
-  color: #5a5a5a
+  color: #5a5a5a;
+  background-color: #f9f9f9
+}
+
+h1.work-sans-light {
+  font-family: "Work Sans", sans-serif;
+  font-weight: 200;
 }
 
 h2 {
   text-align: left; /* center title */
-  font-family: "Roboto", "Arial", sans-serif; /* monospace font for titles */
+  font-family: "Work Sans", "Arial", sans-serif; /* monospace font for titles */
   font-size: 32px;
   color: #b2412d
 }
@@ -43,7 +52,7 @@ a {
   padding: 10px 20px;
   background-color: #AAAAAA;
   color: white;
-  text-align: center;
+  text-align: left;
   text-decoration: none;
   font-size: 16px;
   margin: 8px; /* increased button margins */
