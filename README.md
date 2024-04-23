@@ -1,9 +1,8 @@
 # Three strikes and Who is Out? Individual Differences in Error-Induced Quitting
-Annie Johansson, Abe Hofman, Alexander Savi, and Han van der Maas  
+<p style="text-align: center;">Annie Johansson, Abe Hofman, Alexander Savi, and Han van der Maas  </p>
 
-University of Amsterdam  
+<p style="text=align: center;">University of Amsterdam  </p>
 
-Project completed April 2024  
-
+<p style="text=align: center;">Project completed April 2024  </p>
 
 
