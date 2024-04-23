@@ -11,10 +11,10 @@ body {
 
 /* Title styles */
 h1 {
-  text-align: center; /* center title */
-  font-family: "Work Sans", "Arial", sans-serif; /* monospace font for titles */
+  text-align: left; 
+  font-family: "Work Sans", "Arial", sans-serif; 
   font-size: 45px;
-  font-weight: 200;
+  font-weight: 200; /* not working */
   color: #5a5a5a;
 }
 
