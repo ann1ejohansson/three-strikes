@@ -1,3 +1,18 @@
+.body {
+  font-family: "Helvetica", "Arial", sans-serif;
+  margin: 40px; /* increased margins */
+  padding: 40px;
+}
+
+.h1 {
+  text-align: center; /* center title */
+  font-family: monospace; /* monospace font for titles */
+}
+
+.section {
+  margin-bottom: 20px;
+}
+
 .gallery {
   display: flex;
   flex-wrap: wrap;
