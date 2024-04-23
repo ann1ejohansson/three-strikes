@@ -39,6 +39,11 @@ a {
   transition: background-color 0.3s, color 0.3s; /* Smooth transition for color change */
 }
 
+.button:hover {
+  background-color: #ffc6bc; /* New background color when hovered */
+  color: #cd4f39; /* New text color when hovered */
+}
+
 /* Abstract section styles */
 section {
   margin-bottom: 20px;
