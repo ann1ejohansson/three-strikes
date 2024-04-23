@@ -76,7 +76,7 @@ section {
 }
 
 .gallery-item img {
-  width: 200px;
+  width: auto;
   height: auto;
   cursor: pointer;
 }
