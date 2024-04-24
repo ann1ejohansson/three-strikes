@@ -38,7 +38,6 @@ p {
       display: flex;
       align-items: center;
       max-width: 600px; /* Adjust as needed */
-      margin: 0 auto; /* Center the box */
     }
 
     .authors-box i {
