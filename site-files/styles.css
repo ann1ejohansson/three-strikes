@@ -32,23 +32,23 @@ p {
 
 /* Box style */
 .authors-box {
-      background-color: #f2f2f2;
-      padding: 10px;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      max-width: 600px; /* Adjust as needed */
-    }
+  background-color: #f2f2f2;
+  padding: 10px;
+  border-radius: 10px;
+  /*display: flex;*/
+  align-items: center;
+  max-width: 600px; /* Adjust as needed */
+}
 
-    .authors-box i {
-      margin-right: 10px;
-      font-size: 20px;
-    }
+.authors-box i {
+  margin-right: 20px;
+  font-size: 30px;  
+}
 
-    .authors-box p {
-      margin: 0;
-      font-family: 'Roboto', sans-serif;
-    }
+.authors-box p {
+  margin: 0;
+  font-family: 'Work Sans', sans-serif;
+}
 
 /* Links styles */
 a {
