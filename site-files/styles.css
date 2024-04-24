@@ -159,7 +159,7 @@ section {
 }
 
 .content{
-  height: 400px;
+  height: auto;
   width: 700px;
   overflow: hidden;
   position: relative;
