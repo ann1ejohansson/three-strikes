@@ -13,4 +13,4 @@ function closeModal() {
 }
 
 var IndexValue = 1;
-showImg(IndexValue)
+showImg(IndexValue);
