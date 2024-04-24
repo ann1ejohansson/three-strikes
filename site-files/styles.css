@@ -94,7 +94,6 @@ section {
 }
 
 /* Figures section styles */
-/* Figures section styles */
 .gallery {
   display: flex;
   flex-wrap: wrap;
@@ -158,5 +157,23 @@ section {
   color: #ccc;
   padding: 10px 0;
 }
+
+.content{
+  height: 400px;
+  widht: auto;
+  overflow: hidden;
+  position: relative;
+}
+
+.content images{
+  height: 100%;
+  width: 100%;
+}
+
+.images img{
+  height: 100%; 
+  width: 100%
+}
+
 
 
