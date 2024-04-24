@@ -1,18 +1,13 @@
-var currentIndex = 0;
-var images = document.querySelectorAll(".gallery-item img");
-
-function openModalWithIndex(index) {
-  currentIndex = index;
-  var image = images[index];
-  openModal(image.src, image.alt);
+function openModal(imageSrc, captionText) {
+  var modal = document.getElementById("myModal");
+  var modalImg = document.getElementById("modalImage");
+  var caption = document.getElementById("caption");
+  modal.style.display = "block";
+  modalImg.src = imageSrc;
+  caption.innerHTML = captionText;
 }
 
-function prevImage() {
-  currentIndex = (currentIndex - 1 + images.length) % images.length;
-  openModalWithIndex(currentIndex);
-}
-
-function nextImage() {
-  currentIndex = (currentIndex + 1) % images.length;
-  openModalWithIndex(currentIndex);
+function closeModal() {
+  var modal = document.getElementById("myModal");
+  modal.style.display = "none";
 }
