@@ -175,5 +175,23 @@ section {
   width: 100%
 }
 
+.content .slide{
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 45px;
+  width: 45px;
+  cursor: pointer;
+}
 
+.slide span{
+  font-size: 35px;
+  color: #5a5a5a;
+  line-height: 41px;
+}
+
+.content .right{
+  right: 0;
+} 
+  
 
