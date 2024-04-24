@@ -1,9 +1,11 @@
 # Welcome to the repository for: 
 ## Three strikes and Who is Out? Individual Differences in Error-Induced Quitting
 
-Owner: Annie Johansson
-University of Amsterdam
-Project completed April, 2024
+Project completed April, 2024  
+
+Annie Johansson  
+University of Amsterdam  
+ 
 
 The aim of this project was:  
 
