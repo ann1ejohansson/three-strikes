@@ -66,37 +66,14 @@ section {
 }
 
 /* Figures section styles */
-
+/* Figures section styles */
 .gallery {
-  position: relative;
-}
-
-.gallery-nav {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(0, 0, 0, 0.5);
-  color: white;
-  padding: 10px;
-  cursor: pointer;
-}
-
-.gallery-nav.left {
-  left: 0;
-}
-
-.gallery-nav.right {
-  right: 0;
-}
-
-.gallery-container {
   display: flex;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
+  flex-wrap: wrap;
 }
 
 .gallery-item {
-  scroll-snap-align: center;
+  margin: 5px;
 }
 
 .gallery-item img {
@@ -153,6 +130,5 @@ section {
   color: #ccc;
   padding: 10px 0;
 }
-
 
 
