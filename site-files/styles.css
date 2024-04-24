@@ -159,8 +159,8 @@ section {
 }
 
 .content{
-  height: 400px;
-  width: 700px;
+  height: auto;
+  width: auto;
   overflow: hidden;
   position: relative;
 }
