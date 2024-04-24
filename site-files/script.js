@@ -14,12 +14,14 @@ function closeModal() {
 
 var IndexValue = 1;
 showImg(IndexValue);
+
 function side_slide(e) {
-  showImg (indexValue +=e);
+  showImg (IndexValue +=e);
 }
+
 function showImg(e) {
   var i; 
-  const img = document.querySelectorAll('img')
+  const img = document.querySelectorAll('.images img');
   if(e > img.length) {
     IndexValue = 1
   }
