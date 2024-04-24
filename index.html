@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Three Strikes and Who is Out?<br>Individual Differences in Error-Induced Quitting</title>
+  <i class="fi fi-sr-document"></i>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Work+Sans:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+
+<!-- Title -->
+<h1><strong>Three Strikes and Who is Out?<br>Individual Differences in Error-Induced Quitting</strong></h1>
+<link rel="icon" type="image/x-icon" href="site-files/images/favicon.png">
+
+<!-- Author -->
+<p><i class="fa fa-circle-user"></i><a href="https://www.uva.nl/profiel/j/o/a.m.johansson/a.m.johansson.html">Annie Johansson</a>, <a href="https://https://www.uva.nl/en/profile/h/o/a.d.hofman/a.d.hofman.html">Abe Hofman</a>, <a href="https://psyres.uva.nl/profile/s/a/o.a.savi/o.a.savi.html?origin=qyY%2BaNowQDO5tC%2BqdJFqFw">Alexander Savi</a>, <a href="https://www.uva.nl/en/profile/m/a/h.l.j.vandermaas/h.l.j.vandermaas.html">Han van der Maas</a></p>  
+  
+<!-- Affiliation -->
+<p>University of Amsterdam</p>
+
+<!-- Links -->
+<div style="text-align: left;">
+  <a class="button" href="site-files/supp.pdf" target="_blank"><i class="fa fa-file"></i> PDF</a>
+  <a class="button" href="site-files/supp.pdf" target="_blank"><i class="fa fa-paperclip"></i> Supplementary materials</a>
+  <a class="button" href="./page-code.html"><i class="fa fa-code"></i> Code</a>
+</div>
+
+<!-- Abstract -->
+<section>
+  <h2>Abstract</h2>
+  <p>The biggest threat to learning is not learning. Crucially, sequential errors have been found to be an important cause of quitting from learning. However, little is known about how students are differently affected by sequential errors. Here, we investigate the underlying factors. Using intensive longitudinal practicing data from over $200000$ primary-school students in a large-scale Online Learning Environment (OLE), we confirm previous findings that sequential errors strongly increase the probability of quitting from learning. Second, we find large variability in this effect, ranging from no or small tendencies to quit to high sensitivities to quitting following sequential errors. We validate these results in an independent dataset, and show that individual differences are stable across two across two arithmetic practice domains. Our results corroborate the theoretical notion that students differ in their tolerance to failure and pinpoint a need to individualize how computer-adaptive systems intervene after errors. 
+.</p>
+</section>
+
+<!-- Figures -->
+<section>
+<h2>Figures</h2>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="site-files/styles.css">
+</head>
+  <div class="gallery">
+    <div class="gallery-item">
+      <img src="site-files/images/figure1.jpg" alt="Image 1" onclick="openModal('site-files/images/figure1.jpg', 'Figure 1: Hazard ratios derived from the multi-state survival model. Each hazard ratio represents the relative increase or decrease in quits for each covariate value compared to its reference category. Lines represent the 95% confidence interval. MSSM = Multi-State Survival Model.')">
+    </div>
+    <div class="gallery-item">
+      <img src="site-files/images/figure2.jpg" alt="Image 2" onclick="openModal('site-files/images/figure2.jpg', 'Figure 2: Hazard ratios for the main (left) and interaction (right) effects derived from the 2-state markov model on the addition game. Each hazard ratio for the interaction effects represents the relative increase or decrease in the likelihood of transitioning into a quitting state for each covariate across each level of sequential error. For example, the transitioning into a quitting state when making more than 3 sequential errors is approximately 1.35 times more likely if the response was fast, compared to slow. Lines represent the 95% confidence interval.')">
+    </div>
+     <div class="gallery-item">
+      <img src="site-files/images/figure3.jpg" alt="Image 3" onclick="openModal('site-files/images/figure3.jpg', 'Figure 3: Post-error vs. post-correct quit probabilities, separated across difficulty levels and new vs. existing users. A user was classified as a new user if their first experience in the addition game occurred during the period of data collection, and existing user if they had played the addition game before the start of data collection. Ribbons around the estimates represent a 95% confidence interval.')">
+    </div>
+     <div class="gallery-item">
+      <img src="site-files/images/figure4.jpg" alt="Image 4" onclick="openModal('site-files/images/figure4.jpg', 'Figure 4: Left: Baseline quitting rates (intercept) and effects of sequential errors on quitting (slope) for 300 randomly sampled users, across both the addition and subtraction domain. Datapoints are ordered from lowest to highest effect estimate in both graphs. Horizontal lines denote the fixed effect. Vertical lines represent the 95% confidence interval of each user’s effect, estimated from repeated resampling (n = 200) from the posterior distribution of the random effects. The REsim function from the package merTools (v. 0.6.2, [40]) in R was used to achieve this. The points of users whose effect estimate is not significantly different from the average main effect has a more transparent color. Right: Scatterplots representing the correlation between random effects in the addition and subtraction game. The shaded region represents the 95% confidence interval')">
+    </div>
+     <div class="gallery-item">
+      <img src="site-files/images/figure5.jpg" alt="Image 5" onclick="openModal('site-files/images/figure5.jpg', 'Figure 5: A screenshot of the addition game in Prowise Learn.')">
+    </div>
+     <div class="gallery-item">
+      <img src="site-files/images/figure6.jpg" alt="Image 6" onclick="openModal('site-files/images/figure6.jpg', 'Figure 6: Schematic representation of the continuous multi-state survival model. The model depicts the transitions between each possible state in continuous time: the student is playing and then soft-quits (q12); the student completes a full session after soft-quitting (q21); the student exits the OLE entirely following a soft-quit (q23) or a completed session (q13).')">
+    </div>   
+  </div>
+</section>
+
+  <!-- The Modal -->
+  <div id="myModal" class="modal">
+    <span class="close" onclick="closeModal()">&times;</span>
+    <img class="modal-content" id="modalImage">
+    <div id="caption"></div>
+  </div>
+
+  <script src="site-files/script.js"></script>
+
+
+  
+</body>
+</html>
+

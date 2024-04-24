@@ -16,4 +16,3 @@ The aim of this project was:
 With this project, we found large, reliable individual differences in the extent that children quit followign sequential errors.  While some students perservere in the face of failure, some are highly sensitive and quit the learning process prematurely.  
 
 [Link to project site](https://ann1ejohansson.github.io/three-strikes/).
-
