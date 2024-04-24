@@ -160,7 +160,7 @@ section {
 
 .content{
   height: 400px;
-  widht: 700px;
+  width: 700px;
   overflow: hidden;
   position: relative;
 }
@@ -175,26 +175,27 @@ section {
   width: 100%;
 }
 
-.content .slide{
+.content .slide {
   position: absolute;
   top: 50%;
-  border: 2px solid white;
   transform: translateY(-50%);
   height: 45px;
   width: 45px;
   cursor: pointer;
   background: rgba(255, 255, 255, 0.1);
+  border: 2px solid white; /* Add border */
 }
 
-.content .slide:hover{
+.content .slide:hover {
   background: rgba(255, 255, 255, 0.2);
 }
 
-.slide span{
+.slide span {
   font-size: 35px;
   color: #5a5a5a;
   line-height: 41px;
 }
+
 
 .content .right{
   right: 0;
