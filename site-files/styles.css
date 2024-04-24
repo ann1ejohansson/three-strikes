@@ -200,5 +200,13 @@ section {
 .content .right{
   right: 0;
 } 
+
+.slide.left {
+  left: 0;
+}
+
+.slide.right {
+  right: 0;
+}
   
 
