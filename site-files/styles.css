@@ -20,7 +20,7 @@ h1 {
 
 h2 {
   text-align: left; /* center title */
-  font-family: "Work Sans", "Arial", sans-serif; /* monospace font for titles */
+  font-family: "Work Sans", "Arial", sans-serif; 
   font-size: 32px;
   color: #b2412d
 }
@@ -70,13 +70,14 @@ a:hover {
 /* Button styles */
 .button {
   display: inline-block;
-  padding: 10px 20px;
+  padding: 20px;
   background-color: #5a5a5a;
   color: white;
   text-align: left;
   text-decoration: none;
   font-size: 16px;
-  margin: 8px; /* increased button margins */
+  font-family: "Work Sans", "Arial", sans-serif; 
+  margin: 8px 8px 20px 0; 
   cursor: pointer;
   border-radius: 8px;
   transition: background-color 0.3s, color 0.3s; /* Smooth transition for color change */
