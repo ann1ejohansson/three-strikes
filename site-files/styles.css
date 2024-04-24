@@ -66,13 +66,37 @@ section {
 }
 
 /* Figures section styles */
+
 .gallery {
+  position: relative;
+}
+
+.gallery-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  padding: 10px;
+  cursor: pointer;
+}
+
+.gallery-nav.left {
+  left: 0;
+}
+
+.gallery-nav.right {
+  right: 0;
+}
+
+.gallery-container {
   display: flex;
-  flex-wrap: wrap;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
 }
 
 .gallery-item {
-  margin: 5px;
+  scroll-snap-align: center;
 }
 
 .gallery-item img {
