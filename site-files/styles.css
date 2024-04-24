@@ -30,6 +30,27 @@ p {
   text-align: left; /* left-align paragraphs */
 }
 
+/* Box style */
+.authors-box {
+      background-color: #f2f2f2;
+      padding: 10px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      max-width: 600px; /* Adjust as needed */
+      margin: 0 auto; /* Center the box */
+    }
+
+    .authors-box i {
+      margin-right: 10px;
+      font-size: 20px;
+    }
+
+    .authors-box p {
+      margin: 0;
+      font-family: 'Roboto', sans-serif;
+    }
+
 /* Links styles */
 a {
   text-decoration: underline; /* Add underline to links */
