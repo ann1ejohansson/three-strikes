@@ -11,3 +11,6 @@ function closeModal() {
   var modal = document.getElementById("myModal");
   modal.style.display = "none";
 }
+
+var IndexValue = 1;
+showImg(IndexValue)
