@@ -36,12 +36,7 @@
 
 <!-- Figures -->
 <section>
-<h2>Figures</h2>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="site-files/styles.css">
-</head>
+  <h2>Figures</h2>
   <div class="gallery">
     <div class="gallery-item">
       <img src="site-files/images/figure1.jpg" alt="Image 1" onclick="openModal('site-files/images/figure1.jpg', 'Figure 1: Hazard ratios derived from the multi-state survival model. Each hazard ratio represents the relative increase or decrease in quits for each covariate value compared to its reference category. Lines represent the 95% confidence interval. MSSM = Multi-State Survival Model.')">
@@ -61,17 +56,19 @@
      <div class="gallery-item">
       <img src="site-files/images/figure6.jpg" alt="Image 6" onclick="openModal('site-files/images/figure6.jpg', 'Figure 6: Schematic representation of the continuous multi-state survival model. The model depicts the transitions between each possible state in continuous time: the student is playing and then soft-quits (q12); the student completes a full session after soft-quitting (q21); the student exits the OLE entirely following a soft-quit (q23) or a completed session (q13).')">
     </div>   
+    </div>
+    <div class="gallery-nav right" onclick="nextImage()"><i class="fas fa-chevron-right"></i></div>
   </div>
 </section>
 
-  <!-- The Modal -->
-  <div id="myModal" class="modal">
-    <span class="close" onclick="closeModal()">&times;</span>
-    <img class="modal-content" id="modalImage">
-    <div id="caption"></div>
-  </div>
+<!-- The Modal -->
+<div id="myModal" class="modal">
+  <span class="close" onclick="closeModal()">&times;</span>
+  <img class="modal-content" id="modalImage">
+  <div id="caption"></div>
+</div>
 
-  <script src="site-files/script.js"></script>
+<script src="site-files/script.js"></script>
 
   
 </body>
