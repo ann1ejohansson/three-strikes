@@ -20,7 +20,7 @@ h1 {
 
 h2 {
   text-align: left; /* center title */
-  font-family: "Work Sans", "Arial", sans-serif; /* monospace font for titles */
+  font-family: "Work Sans", "Arial", sans-serif; 
   font-size: 32px;
   color: #b2412d
 }
@@ -28,6 +28,33 @@ h2 {
 /* Paragraph styles */
 p {
   text-align: left; /* left-align paragraphs */
+}
+
+pre code {
+ background-color: #f2f2f2; /* Your desired background color */
+ display: block; /* Make it a block element */
+ padding: 10px; /* Add some padding */
+ border-radius: 5px; /* Add rounded corners */
+}
+
+/* Box style */
+.authors-box {
+  background-color: #f2f2f2;
+  padding: 10px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  max-width: 600px; /* Adjust as needed */
+}
+
+.authors-box i {
+  margin-right: 20px;
+  font-size: 30px;  
+}
+
+.authors-box p {
+  margin: 0;
+  font-family: 'Work Sans', sans-serif;
 }
 
 /* Links styles */
@@ -43,13 +70,14 @@ a:hover {
 /* Button styles */
 .button {
   display: inline-block;
-  padding: 10px 20px;
-  background-color: #AAAAAA;
+  padding: 10px;
+  background-color: #5a5a5a;
   color: white;
   text-align: left;
   text-decoration: none;
   font-size: 16px;
-  margin: 8px; /* increased button margins */
+  font-family: "Work Sans", "Arial", sans-serif; 
+  margin: 8px 8px 20px 0; 
   cursor: pointer;
   border-radius: 8px;
   transition: background-color 0.3s, color 0.3s; /* Smooth transition for color change */
@@ -84,7 +112,6 @@ section {
   margin-bottom: 20px;
 }
 
-/* Figures section styles */
 /* Figures section styles */
 .gallery {
   display: flex;
@@ -150,4 +177,55 @@ section {
   padding: 10px 0;
 }
 
+.content{
+  height: auto;
+  width: 700px;
+  overflow: hidden;
+  position: relative;
+}
+
+.content images{
+  height: 100%;
+  width: 100%;
+}
+
+.images img{
+  height: 100%; 
+  width: 100%;
+}
+
+.content .slide {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 45px;
+  width: 45px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid white; /* Add border */
+}
+
+.content .slide:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.slide span {
+  font-size: 35px;
+  color: #5a5a5a;
+  line-height: 41px;
+}
+
+
+.content .right{
+  right: 0;
+} 
+
+.slide.left {
+  left: 0;
+}
+
+.slide.right {
+  right: 0;
+}
+  
 
