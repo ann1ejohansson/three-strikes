@@ -1,0 +1,45 @@
+Transition,Covariate,Hazard Ratio,95% CI
+Persisting to Soft-Quit,"1 Seq error 
+ vs. No error",4.666,"[ 4.455 , 4.887 ]"
+Persisting to Soft-Quit,"2 Seq errors 
+ vs. No error",7.768,"[ 7.386 , 8.171 ]"
+Persisting to Soft-Quit,"3 Seq errors 
+ vs. No error",13.341,"[ 12.652 , 14.068 ]"
+Persisting to Soft-Quit,">3 Seq errors 
+ vs. No error",8.462,"[ 7.923 , 9.039 ]"
+Persisting to Soft-Quit,"Fast error  
+ vs. No error",3.092,"[ 2.969 , 3.22 ]"
+Persisting to Soft-Quit,"Slow error  
+ vs. No error",0.846,"[ 0.811 , 0.882 ]"
+Persisting to Soft-Quit,"During school 
+ vs. Outside school",1.39,"[ 1.321 , 1.462 ]"
+Persisting to Soft-Quit,"High diff 
+ vs. Medium diff",1.093,"[ 1.049 , 1.138 ]"
+Persisting to Soft-Quit,"High diff 
+ vs. Low diff",1.215,"[ 1.167 , 1.265 ]"
+Persisting to Soft-Quit,"Higer grades  
+ vs. Lower grades",1.324,"[ 1.285 , 1.364 ]"
+Persisting to Soft-Quit,"Girls  
+ vs. Boys",1.021,"[ 0.99 , 1.052 ]"
+Persisting to Hard-Quit,"1 Seq error 
+ vs. No error",2.493,"[ 2.345 , 2.649 ]"
+Persisting to Hard-Quit,"2 Seq errors 
+ vs. No error",2.699,"[ 2.501 , 2.913 ]"
+Persisting to Hard-Quit,"3 Seq errors 
+ vs. No error",2.038,"[ 1.829 , 2.271 ]"
+Persisting to Hard-Quit,">3 Seq errors 
+ vs. No error",1.989,"[ 1.748 , 2.265 ]"
+Persisting to Hard-Quit,"Fast error  
+ vs. No error",2.064,"[ 1.932 , 2.205 ]"
+Persisting to Hard-Quit,"Slow error  
+ vs. No error",1.013,"[ 0.951 , 1.078 ]"
+Persisting to Hard-Quit,"During school 
+ vs. Outside school",2.584,"[ 2.344 , 2.848 ]"
+Persisting to Hard-Quit,"High diff 
+ vs. Medium diff",1.032,"[ 0.971 , 1.097 ]"
+Persisting to Hard-Quit,"High diff 
+ vs. Low diff",1.082,"[ 1.019 , 1.149 ]"
+Persisting to Hard-Quit,"Higer grades  
+ vs. Lower grades",1.252,"[ 1.197 , 1.309 ]"
+Persisting to Hard-Quit,"Girls  
+ vs. Boys",0.893,"[ 0.854 , 0.934 ]"

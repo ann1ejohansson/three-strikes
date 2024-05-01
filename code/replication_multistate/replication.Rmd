@@ -1,0 +1,490 @@
+---
+title: "Replication of the Multi-State Model"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    keep_tex: yes
+---
+```{r Options}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.align = "left",
+  out.width = "100%", 
+  tidy = TRUE
+)
+```
+
+This script takes the prepared data (from *replication_data_prep*) and fits the multistate survival model to it. This is an attempt to replicate the outcomes from ten Broeke et al. (2022), and therefore much of the code is replicated, and should be accredited to, the authors of this paper.
+
+```{r Libraries, message=F, include=FALSE}
+source("~/research-collaboration/quitting_ind_differences/dependencies.R")
+library(lmtest)
+```
+
+```{r Working directory, include=FALSE}
+setwd("~/research-collaboration/quitting_ind_differences/replication_multistate")
+path <- getwd()
+path_to_plots <- "~/research-collaboration/quitting_ind_differences/replication_multistate/plots"
+path_to_tables <- "~/research-collaboration/quitting_ind_differences/replication_multistate/tables"
+```
+
+# Descriptives 
+
+```{r Load data and minor cleaning}
+dat <- readRDS(paste0(path_to_data, "/replication_clean.Rdata"))
+dat <- data.table(dat)
+setkeyv(dat, cols = c("created", "user_id"))
+
+# Load domain info data
+load(paste0(path_to_data, "/domain_info.Rdata"))
+colnames(domain_info)[1] <- "domain_id"
+colnames(domain_info)[2] <- "application"
+domain_info <- data.table(domain_info)
+
+# Load user data
+load(paste0(path_to_data, "/user_info.Rdata"))
+user_info <- data.table(user_info)
+
+# Some consolidation and filtering
+# dat[is.na(non_deliberate), non_deliberate := 0]
+dat <- dat[grade > 2 & grade < 9 & non_deliberate == 0]
+dat <- dat[, grade_collapse := fct_collapse(factor(grade),
+                                                        lower_grades = c("3", "4", "5"),
+                                                        higher_grades = c("6", "7", "8"))]
+dat <- merge(dat, domain_info[, .(domain_id, application)], by = "domain_id")
+dat <- merge(dat, user_info[, .(user_id, gender)], by = "user_id")
+
+# Setting a key to ensure proper ordering
+dat <- data.table(dat)
+setkeyv(dat, c("user_id", "created"))
+
+dat$difficulty <- factor(dat$difficulty)
+dat$error_seq_cat_shift <- factor(dat$error_seq_cat_shift)
+dat$weekend_evening <- factor(dat$weekend_evening)
+
+# Specifying the order of the discretized variables explicitly to ensure correct reference category
+levels(dat$error_seq_cat_shift) <- list(`0` = "0",
+                                                      `1`  = "1",
+                                                      `2` = "2",
+                                                      `3` = "3",
+                                                      `>3` = ">3")
+levels(dat$weekend_evening) <- list(`1` = "1",
+                                          `0` = "0")
+levels(dat$difficulty) <- list(`2` = "2",
+                                     `1` = "1",
+                                     `0` = "0")
+levels(dat$grade_collapse) <- list(`higher_grades` = "higher_grades",
+                                         `lower_grades` = "lower_grades")
+levels(dat$gender) <- list(`m` = "m",
+                                 `f` = "f")
+```
+
+## Sample size
+```{r N,echo=TRUE}
+N <- dat[, uniqueN(user_id)]
+cat("Total Sample Size:\n")
+N
+
+N_append <- data.frame(grade = "total", 
+                       N = N)
+N_grade <- dat[, .(N = uniqueN(user_id)), by = grade][order(grade)]
+cat("Sample Size Per Grade:\n")
+N_grade 
+N_grade_with_total <- rbind(N_grade, N_append)
+write.csv(N_grade_with_total,
+       paste0(path_to_tables, "/N.csv"))
+```
+
+There are slightly more males compared to females in the data. 
+```{r N by gender}
+ggplot(data = dat[, uniqueN(user_id), by = gender]) +
+  geom_bar(aes(x = factor(gender), y = V1), stat = "identity", color = colors[1], fill = colors[1], alpha=0.5) +
+  geom_label(aes(x = factor(gender), y = V1, label = V1), color = colors[1]) +
+  labs(x = "Gender", y = "N", title = "N per Gender") +
+  scale_x_discrete(labels = c("Female", "Male", "Not Specified")) +
+  theme_minimal()
+```
+
+## State distribution 
+Here, I examine how the frequency of being in a certain state (1, 2, or 3) varies across grade and gender in the data. 
+
+```{r State distribution, fig.width=8, fig.height=4}
+ggplot(data = dat[, .N, by = .(grade, State)][order(grade, State)]) +
+  geom_bar(aes(x = factor(grade), fill = factor(State), y = N), stat = "identity", position = "dodge") + 
+  labs(title = "State distribution by grade", y = "N", x = "Grade") +
+  scale_fill_manual(values = colors[1:3], name= "State") +
+  theme_minimal() 
+
+ggplot(data = dat[!is.na(gender), .N, by = .(gender, State)][order(gender, State)]) +
+  geom_bar(aes(x = gender, fill = factor(State), y = N), stat = "identity", position = "dodge") + 
+  labs(title = "State distribution by gender", y = "N", x = "Gender") +
+  scale_fill_manual(values = colors[1:3], name = "State") +
+  theme_minimal()
+```
+
+## Number of sessions completed
+The majority of users have completed 1-10 full sessions. This ranges from 1 to 945 completed sessions. 
+
+```{r Session distribution }
+# Number of sessions played
+ggplot(dat[item_count == 10, .N, by = user_id], aes(x = N)) +
+  geom_histogram(color = colors[2], fill = colors[2], alpha=0.5, bins = 200) +
+  labs(x = "N per user",
+       title = "Distribution of number of sessions completed") +
+  theme_minimal()
+```
+
+## Sequential errors 
+There is a large amount of errors (sequential errors = 1), but the frequency of 2, 3, and more than 3 sequential errors gradually decreases. 
+
+```{r Distribution sequential errors }
+ggplot(data = dat[, .N, by = error_seq_cat]) +
+  geom_bar(aes(x = error_seq_cat, y = N), stat = "identity", position = "dodge",
+           color = colors[1], fill = colors[1], alpha=0.5) + 
+  labs(title = "Frequency of Sequential Errors") +
+  theme_minimal()
+```
+
+# Multistate Survial Model 
+## Transition matrix
+
+For a model with three states, a transition intensity matrix (Q) is defined:
+```{r Transition matrix, echo=FALSE}
+Q <- matrix(data = c(1, 1, 1, 1, 1, 1, 0, 0, 0), 
+            nrow = 3,
+            ncol = 3,
+            byrow = T)
+
+rownames(Q) <- colnames(Q) <- c("Persisting",
+                                "Soft-Quit",
+                                "Hard-Quit")
+
+Q
+```
+
+## Model fitting
+
+The model fit procedures are specified in a separate script, *"modelfit_msm.R"*. The outputs from that model fitting have been saved and can be loaded into the environment below.
+
+*msm_constrained_all*, *msm_constrained_rt* and *msm_constrained_tz* are the constrained models. That is, the multistate models without any covariates added.
+
+*msm_covariate_all*, *msm_covariate_rt* and *msm_covariate_tz* are the covariate models. The following covariates were added to these models:
+
+-   Gender
+
+-   Grade (higher grades vs. lower grades)
+
+-   Difficulty (high vs. low, and high vs. medium)
+
+-   Speed of errors (fast error vs. no error and slow error vs. no error)
+
+-   Playing during vs. outside school hours
+
+-   Sequential errors (vs. no error: 1, 2, 3, \>3)
+
+*hr_msm_covariate_rt* and *hr_msm_covariate_tz* specify the transition probabilities for each covariate (hazard ratios) in the rekentuin and taalzee models, respectively.
+
+```{r MSM fit, warning = FALSE, include=FALSE}
+# Run this to fit the model to the data. 
+# source(paste0(path, "/sepjob_msm.R"))
+
+# Load model data
+msm_constrained_all <- readRDS("~/research-collaboration/quitting_ind_differences/replication_multistate/models/msm_constrained_all.Rdata")
+# msm_constrained_rt <- readRDS(paste0(path_to_data, "/msm_constrained_rt.Rdata"))
+# msm_constrained_tz <- readRDS(paste0(path_to_data, "/msm_constrained_tz.Rdata"))
+
+msm_covariate_all <- readRDS("~/research-collaboration/quitting_ind_differences/replication_multistate/models/msm_covariate_all.Rdata")
+# msm_covariate_rt <- readRDS(paste0(path_to_data, "/msm_covariate_rt.Rdata"))
+# msm_covariate_tz <- readRDS(paste0(path_to_data, "/msm_covariate_tz.Rdata"))
+
+# hr_msm_covariate_all <- readRDS(paste0(path_to_data, "/hr_msm_covariate_all.Rdata"))
+hr_msm_covariate_rt <- readRDS("~/research-collaboration/quitting_ind_differences/replication_multistate/models/hr_msm_covariate_rt.Rdata")
+hr_msm_covariate_tz <- readRDS("~/research-collaboration/quitting_ind_differences/replication_multistate/models/hr_msm_covariate_tz.Rdata")
+```
+
+
+## State transition rates
+### Transition intensities 
+Here, the estimated Q-matrices for the constrained and covariate models are extracted.
+
+```{r Specify model, echo=TRUE}
+model <- "covariate" # "constrained" or "covariate"
+```
+
+
+```{r Q matrices, }
+if(model == "covariate") {
+  q_est <- rbind(qmatrix.msm(msm_covariate_all)[, 1], qmatrix.msm(msm_covariate_all)[, 2], qmatrix.msm(msm_covariate_all)[, 3])
+} else{
+   q_est <- rbind(qmatrix.msm(msm_constrained_all)[, 1], qmatrix.msm(msm_constrained_all)[, 2], qmatrix.msm(msm_constrained_all)[, 3])
+}
+
+rownames(q_est) <- c("Persisting > Persiting", 
+                     "Persiting > Soft-Quit", 
+                     "Persiting > Hard-Quit",
+                     "Soft-Quit > Persiting", 
+                     "Soft-Quit > Soft-Quit", 
+                     "Soft-Quit > Hard-Quit",
+                     "Hard-Quit > Persiting", 
+                     "Hard-Quit > Soft-Quit", 
+                     "Hard-Quit > Hard-Quit")
+q_est <- as.data.frame(round(q_est[c(1:2, 4:5, 7:8),], 3))
+q_est$"95% CI" <- paste("[", q_est$lower, "  ", q_est$upper, "]") 
+q_est$"95% CI" <- as.character(q_est$"95% CI")
+q_est <- q_est[, -c(3:4)]
+q_est
+if(model == "covariate") {
+  write.csv(q_est, file = paste0(path_to_tables, "/q_matrix_cov.csv")) 
+} else {
+  write.csv(q_est, file = paste0(path_to_tables, "/q_matrix_con.csv")) 
+}
+```
+
+### Transition Probabilities
+Also extracting state transition probability matrices
+```{r P martices }
+if(model == "covariate") {
+  P_matrix <- pmatrix.msm(msm_covariate_all)
+  cat("Transition probabilities for covariate model\n")
+  print(P_matrix)
+  write.csv(round(P_matrix, 3), file = paste0(path_to_tables, "/p_matrix_cov.csv"))
+} else {
+  P_matrix <- pmatrix.msm(msm_constrained_all)
+  cat("Transition probabilities for constrained model\n")
+  print(P_matrix)
+  write.csv(round(P_matrix, 3), file = paste0(path_to_tables, "/p_matrix_con.csv"))
+}
+```
+
+
+```{r Final state transition table}
+P_matrix_cov <- round(pmatrix.msm(msm_covariate_all), 3)
+Q_matrix_cov <- round(msm_covariate_all$Qmatrices$baseline, 3)
+
+p <- data.frame("State" = c("Persiting", "Soft-Quit", "Hard-Quit"),
+                "Persisting_P" = c(as.numeric(P_matrix_cov)[1:3]), 
+                "Soft-Quit_P" = c(as.numeric(P_matrix_cov)[4:6]),
+                "Hard-Quit_P" = c(as.numeric(P_matrix_cov)[7:9]))
+
+q <- data.frame("State" = c("Persiting", "Soft-Quit", "Hard-Quit"),
+                "Persisting_Q" = c(as.numeric(Q_matrix_cov)[1:3]), 
+                "Soft-Quit_Q" = c(as.numeric(Q_matrix_cov)[4:6]),
+                "Hard-Quit_Q" = c(as.numeric(Q_matrix_cov)[7:9]))
+
+transition_rates_full <- cbind(q, p[,-1])
+
+write.csv(transition_rates_full,
+       paste0(path_to_tables, "/trans_rates.csv"))
+```
+
+### Likelihood Ratio Test
+
+```{r Model comparison}
+lr_test <- lrtest(msm_constrained_all, msm_covariate_all)
+lr_test$Df
+
+model_comp <- data.frame(model = c("constrained", "covariate"),
+           AIC = c(round(AIC(msm_constrained_all)), round(AIC(msm_covariate_all))),
+           minus_2_loglik = c(round(msm_constrained_all$minus2loglik), round(msm_covariate_all$minus2loglik)),
+           lr_test_loglik = round(lr_test$LogLik),
+           lr_test_df = lr_test$`#Df`,
+           lr_test_df_diff = lr_test$Df,
+           lr_test_chisq = lr_test$Chisq,
+           lr_test_p = lr_test$`Pr(>Chisq)`)
+model_comp
+write.csv(model_comp,
+       paste0(path_to_tables, "/model_comp.csv"))
+
+```
+The covariate model significantly improves model fit, ($\chi^2$(44) = 1238246, _p_ < 0.001), supporting the further use of this model. 
+
+## Hazard ratios
+
+The effect of each covariate on the model is expressed in the form of Hazard Ratios. Specifically, they are a maximum likelihood computation of the relative effect of the covariate on the probability of a state transition.
+
+The below code extracts the hazard ratios from the covariate model, and adds them to a table (*hazardratios*) that can be used to plot the data.
+
+```{r Prep data for plotting, include=FALSE}
+varnames_plot <- c("1 Seq error \n vs. No error",
+                   "2 Seq errors \n vs. No error",
+                   "3 Seq errors \n vs. No error",
+                   ">3 Seq errors \n vs. No error",
+                   "Fast error  \n vs. No error",
+                   "Slow error  \n vs. No error",
+                   "During school \n vs. Outside school",
+                    "Low vs.High \n Difficulty Level",
+                    "Medium vs. High \n Difficulty Level",
+                   "Higer grades  \n vs. Lower grades",
+                   "Girls  \n vs. Boys")
+
+order_varnames <- rev(c("Girls  \n vs. Boys",
+                    "Higer grades  \n vs. Lower grades",
+                    "Low vs.High \n Difficulty Level",
+                    "Medium vs. High \n Difficulty Level",
+                    "Slow error  \n vs. No error",
+                    "Fast error  \n vs. No error",
+                    "During school \n vs. Outside school",
+                    ">3 Seq errors \n vs. No error",
+                    "3 Seq errors \n vs. No error",
+                    "2 Seq errors \n vs. No error",
+                    "1 Seq error \n vs. No error"
+                                           ))
+```
+
+```{r Extract hazard ratios, }
+# Rekentuin
+df_rt = as.data.frame(hr_msm_covariate_rt)
+
+df_hazardratios_rt <- data.frame("application" = "rekentuin",
+                                 "varnames" = sub("\\.HR$", "", 
+                                               colnames(df_rt[seq(from = 1, to = length(df_rt), by = 3)])),
+                                 "varnames_plot" = varnames_plot,
+                              "P-SQ_HR" = as.numeric(df_rt[1, seq(from = 1, to = length(df_rt), by = 3)]),
+                              "P-SQ_CI_L" = as.numeric(df_rt[1, seq(from = 2, to = length(df_rt), by = 3)]),
+                              "P-SQ_CI_U" = as.numeric(df_rt[1, seq(from = 3, to = length(df_rt), by = 3)]),
+                            
+                              "P-HQ_HR" = as.numeric(df_rt[2, seq(from = 1, to = length(df_rt), by = 3)]),
+                              "P-HQ_CI_L" = as.numeric(df_rt[2, seq(from = 2, to = length(df_rt), by = 3)]),
+                              "P-HQ_CI_U" = as.numeric(df_rt[2, seq(from = 3, to = length(df_rt), by = 3)]),
+                              
+                              "SQ-P_HR" = as.numeric(df_rt[3, seq(from = 1, to = length(df_rt), by = 3)]),
+                              "SQ-P_CI_L" = as.numeric(df_rt[3, seq(from = 2, to = length(df_rt), by = 3)]),
+                              "SQ-P_CI_U" = as.numeric(df_rt[3, seq(from = 3, to = length(df_rt), by = 3)]),
+                              
+                              "SQ-HQ_HR" = as.numeric(df_rt[4, seq(from = 1, to = length(df_rt), by = 3)]),
+                              "SQ-HQ_CI_L" = as.numeric(df_rt[4, seq(from = 2, to = length(df_rt), by = 3)]),
+                              "SQ-HQ_CI_U" = as.numeric(df_rt[4, seq(from = 3, to = length(df_rt), by = 3)])
+                              )
+
+# Append variable names
+df_hazardratios_rt$varnames_plot <- factor(df_hazardratios_rt$varnames_plot,
+                                           levels = order_varnames)
+                                                      
+
+# Taalzee
+df_tz = as.data.frame(hr_msm_covariate_tz)
+
+df_hazardratios_tz <- data.frame("application" = "taalzee", 
+                                 "varnames" = sub("\\.HR$", "", 
+                                               colnames(df_tz[seq(from = 1, to = length(df_tz), by = 3)])),
+                                 "varnames_plot" = varnames_plot,
+                              "P-SQ_HR" = as.numeric(df_tz[1, seq(from = 1, to = length(df_tz), by = 3)]),
+                              "P-SQ_CI_L" = as.numeric(df_tz[1, seq(from = 2, to = length(df_tz), by = 3)]),
+                              "P-SQ_CI_U" = as.numeric(df_tz[1, seq(from = 3, to = length(df_tz), by = 3)]),
+                            
+                              "P-HQ_HR" = as.numeric(df_tz[2, seq(from = 1, to = length(df_tz), by = 3)]),
+                              "P-HQ_CI_L" = as.numeric(df_tz[2, seq(from = 2, to = length(df_tz), by = 3)]),
+                              "P-HQ_CI_U" = as.numeric(df_tz[2, seq(from = 3, to = length(df_tz), by = 3)]),
+                              
+                              "SQ-P_HR" = as.numeric(df_tz[3, seq(from = 1, to = length(df_tz), by = 3)]),
+                              "SQ-P_CI_L" = as.numeric(df_tz[3, seq(from = 2, to = length(df_tz), by = 3)]),
+                              "SQ-P_CI_U" = as.numeric(df_tz[3, seq(from = 3, to = length(df_tz), by = 3)]),
+                              
+                              "SQ-HQ_HR" = as.numeric(df_tz[4, seq(from = 1, to = length(df_tz), by = 3)]),
+                              "SQ-HQ_CI_L" = as.numeric(df_tz[4, seq(from = 2, to = length(df_tz), by = 3)]),
+                              "SQ-HQ_CI_U" = as.numeric(df_tz[4, seq(from = 3, to = length(df_tz), by = 3)])
+                              )
+
+# Append variable names
+df_hazardratios_tz$varnames_plot <- factor(df_hazardratios_tz$varnames_plot,
+                                           levels = order_varnames)
+
+# Join RT and TZ tables
+hazardratios <- rbind(df_hazardratios_rt, df_hazardratios_tz)
+```
+
+### Plot
+
+I plot the hazard ratios and their confidence intervals for the persisting \> soft-quit and persisting \> hard-quit transitions for Math Garden and Language Sea, respectively. The plot gets saved to the directory under the folder "plots".
+
+```{r Plot HRs, fig.width = 8, fig.height = 10}
+df_hr_plot <- data.frame(application = rep(c("Math Garden", "Language Sea"), each = 22),
+                     transition = rep(c("Persisting to Soft-Quit" ,"Persisting to Hard-Quit"), each = 11, times = 2),
+                     var = rep(factor(varnames_plot, levels = order_varnames), 4),
+                     hr = c(hazardratios[hazardratios$application == "rekentuin", "P.SQ_HR"],
+                            hazardratios[hazardratios$application == "rekentuin", "P.HQ_HR"],
+                            hazardratios[hazardratios$application == "taalzee", "P.SQ_HR"],
+                            hazardratios[hazardratios$application == "taalzee", "P.HQ_HR"]),
+                     ci_l = c(hazardratios[hazardratios$application == "rekentuin", "P.SQ_CI_L"],
+                            hazardratios[hazardratios$application == "rekentuin", "P.HQ_CI_L"],
+                            hazardratios[hazardratios$application == "taalzee", "P.SQ_CI_L"],
+                            hazardratios[hazardratios$application == "taalzee", "P.HQ_CI_L"]),
+                     ci_u = c(hazardratios[hazardratios$application == "rekentuin", "P.SQ_CI_U"],
+                            hazardratios[hazardratios$application == "rekentuin", "P.HQ_CI_U"],
+                            hazardratios[hazardratios$application == "taalzee", "P.SQ_CI_U"],
+                            hazardratios[hazardratios$application == "taalzee", "P.HQ_CI_U"])
+                     )
+
+plot_hr <- ggplot(df_hr_plot,aes(x = var, y = hr)) +
+  geom_point(size = 1, color = colors[1]) + 
+  geom_linerange(aes(ymin = ci_l, ymax = ci_u), 
+                 color = colors[1], alpha = 0.5) + 
+  geom_hline(yintercept = 1, color = colors[5], linetype = "dashed") +
+  coord_flip() +
+  labs(y = "Hazard Ratio", x  = "") +
+  scale_y_continuous(breaks = 1:14) +
+  geom_text(
+    aes(x = var, y = hr, label = round(hr, 2)),
+    vjust = -0.8,
+    color = colors[4],
+    size = 3) +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 8, color = colors[4]),
+        axis.text.y = element_text(size = 8, face = "bold"),
+        strip.background = element_rect(fill = colors[6], color = colors[4]),
+        strip.text = element_text(color = colors[4], size = 10),
+        panel.border = element_rect(color = colors[4], fill = NA, linewidth = 0.5)) +
+  facet_grid(application~transition)
+
+export_plot(plot_hr)
+```
+
+
+```{r Plot HRs log scale, fig.width = 8, fig.height = 10}
+plot_hr_log <- plot_hr + scale_y_log10()
+
+plot_hr_log
+export_plot(plot_hr_log)
+```
+
+### Hazard ratio tables
+
+In order to easily compare the values to the previous paper, here I extract the hazard ratios, with their confidence intervals, in table format and save them to the directory.
+
+```{r Tables, echo=FALSE}
+# Rekentuin
+df_hr_plot <- as.data.table(df_hr_plot)
+t_hr_sq_rt <- df_hr_plot[application == "Math Garden" & transition == "Persisting to Soft-Quit"]
+t_hr_sq_rt[, "95% CI" := paste("[", round(ci_l, 3), ",", round(ci_u, 3), "]")]
+t_hr_sq_rt[, hr := round(hr, 3)]
+t_hr_sq_rt <- t_hr_sq_rt[,-c(5:6)]
+t_hr_hq_rt <- df_hr_plot[application == "Math Garden" & transition == "Persisting to Hard-Quit"]
+t_hr_hq_rt[, "95% CI" := paste("[", round(ci_l, 3), ",", round(ci_u, 3), "]")]
+t_hr_hq_rt[, hr := round(hr, 3)]
+t_hr_hq_rt <- t_hr_hq_rt[,-c(5:6)]
+hrs_rt <- rbind(t_hr_sq_rt[, -1], t_hr_hq_rt[, -1])
+colnames(hrs_rt) <- c("Transition", "Covariate", "Hazard Ratio", "95% CI")
+hrs_rt
+
+# Taalzee
+df_hr_plot <- as.data.table(df_hr_plot)
+t_hr_sq_tz <- df_hr_plot[application == "Language Sea" & transition == "Persisting to Soft-Quit"]
+t_hr_sq_tz[, "95% CI" := paste("[", round(ci_l, 3), ",", round(ci_u, 3), "]")]
+t_hr_sq_tz[, hr := round(hr, 3)]
+t_hr_sq_tz <- t_hr_sq_tz[,-c(5:6)]
+t_hr_hq_tz <- df_hr_plot[application == "Language Sea" & transition == "Persisting to Hard-Quit"]
+t_hr_hq_tz[, "95% CI" := paste("[", round(ci_l, 3), ",", round(ci_u, 3), "]")]
+t_hr_hq_tz[, hr := round(hr, 3)]
+t_hr_hq_tz <- t_hr_hq_tz[,-c(5:6)]
+hrs_tz <- rbind(t_hr_sq_tz[, -1], t_hr_hq_tz[, -1])
+colnames(hrs_tz) <- c("Transition", "Covariate", "Hazard Ratio", "95% CI")
+hrs_tz
+
+fwrite(hrs_rt, 
+       paste0(path_to_tables, "/extras/hrs_rekentuin.csv"))
+fwrite(hrs_tz, 
+       paste0(path_to_tables, "/extras/hrs_languagesea.csv"))
+```
+
