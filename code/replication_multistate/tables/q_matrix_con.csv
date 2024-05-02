@@ -1,0 +1,7 @@
+"","estimate","SE","95% CI"
+"Persisting > Persiting",-0.107,0,"[ -0.107 , -0.106 ]"
+"Persiting > Soft-Quit",0.188,0.001,"[ 0.186 , 0.189 ]"
+"Soft-Quit > Persiting",0.073,0,"[ 0.072 , 0.073 ]"
+"Soft-Quit > Soft-Quit",-0.237,0.001,"[ -0.239 , -0.236 ]"
+"Hard-Quit > Persiting",0.034,0,"[ 0.034 , 0.034 ]"
+"Hard-Quit > Soft-Quit",0.05,0,"[ 0.049 , 0.05 ]"

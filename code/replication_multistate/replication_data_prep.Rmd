@@ -1,0 +1,415 @@
+---
+title: "Replication Data"
+output: html_document
+date: "2023-07-28"
+---
+
+This script loads the raw 2-month Oefenweb data and prepares it for the main replication analysis.
+
+```{r Directory and libraries, warning = FALSE, message = FALSE}
+setwd("/home/user-048/research-collaboration/quitting_ind_differences/data_prep")
+path <- getwd()
+
+library(tidyverse) 
+library(dplyr)
+library(data.table)
+library(lubridate)
+library(slider)
+```
+
+# Loading data
+```{r Load data}
+all_logs <- load("~/research-collaboration/data/data_31_07/logs_replication_quitting.Rdata")
+
+# Set as data.table
+all_logs <- data.table(logs)
+rm(logs)
+setkeyv(all_logs, cols = c("created", "user_id"))
+
+all_logs %<>%
+  # Removing domain 5 as it has more than 10 items per game. 
+  filter(domain_id != 5) %>%
+  mutate(created = parse_date_time(created, orders = "%Y:%m:%d %H:%M:%S"),
+         date = as.Date(created),
+         time = format(created, "%H:%M:%S")) %>%
+  distinct(user_id, created, .keep_all = TRUE) %>%
+  data.table()
+
+all_logs[, out_of_time := ifelse(correct_answered == "…", 1, 0)]
+all_logs[, question_mark := ifelse(correct_answered == "¿", 1, 0)]
+all_logs[, correct_answered := ifelse(out_of_time == 1 | question_mark == 1, 0, correct_answered)]
+all_logs[, correct_answered := as.numeric(correct_answered)]
+```
+
+# Variable computations
+## Session count 
+Because some sessions are learning goal sessions and some are not, I am checking so that the session counter is computed correctly here. It needs to be sequential across time, regardless of the type of session. For example, one session can not be linked with several dates (this is a problem which was discovered and is being fixed here).
+
+```{r Check session variable}
+# Check session variable 
+dat <- all_logs
+dat1 <- dat[, max(created), by = .(user_id, domain_id, session)]
+dat2 <- dat[, min(created), by = .(user_id, domain_id, session)]
+dat1$t2 <- dat2$V1
+dat1$time_diff <- difftime(dat1$V1, dat1$t2, unit = "days")
+table(dat1$time_diff > 1)
+length(unique(dat1[dat1$time_diff > 1]$user_id))
+sessions <- dat1[time_diff > 1, .(user_id, domain_id, session)]
+df_tmp <- dat[sessions, on = c("user_id", "domain_id", "session")]
+
+temp <- paste(all_logs$session, all_logs$learning_goal_id, sep = "-")
+length(unique(temp))
+length(unique(all_logs$session))
+
+all_logs$session_lg <- temp
+
+# New session counter
+all_logs[, session_count := rleid(session_lg), by = user_id]
+```
+
+```{r Recheck session variable}
+table(all_logs[, .N, by = .(user_id, domain_id, session_count)]$N > 10)
+# 88 sessions have more than 10 observations. This will affect the item counter, so I have to remove these.
+
+all_logs[, .N, by = .(user_id, domain_id, session_count)][N > 10, uniqueN(user_id)]
+
+# Remove these users (n = 68)
+all_logs <- all_logs[!user_id %in% all_logs[, .N, by = .(user_id, domain_id, session_count)][N > 10, unique(user_id)]]
+```
+
+## Item count
+```{r Item counter}
+all_logs[, item_count := order(created), by  = c("user_id", "domain_id", "session_count")] 
+table(all_logs$item_count)
+```
+
+```{r Clean-up}
+rm(dat, dat1, dat2, df_tmp, sessions, temp)
+gc()
+```
+
+## MSM variables 
+### Session id
+
+Denotes the session number of a given player on a given day. 
+
+```{r Session id}
+# Time difference = time between a response x and x-1.
+all_logs[,
+        diff := difftime(time1 = created,
+                         time2 = shift(created, type = "lag"),
+                         units = "mins"),
+        by = .(user_id, date)]
+
+all_logs$diff <- round(all_logs$diff, 0)
+
+# The first of which has no x-1 which results in a NA, I replace these NA's with 0 here.
+all_logs$diff[is.na(all_logs$diff)] <- 0
+
+# This is a function which loops through the new diff column to detect when the difference between x and x-1 exceeds 30 minutes. I count this as a new session.
+time_interval <- 30
+
+time_detecter <- function(x) {
+
+  game <- 1
+  bin <- numeric()
+
+  for (i in 1:length(x)) { #nolint
+    if (x[i] < time_interval) {
+      bin[i] <- game
+    } else if (x[i] >= time_interval) {
+      game <- game + 1
+      bin[i] <- game
+    }
+  }
+  return(bin)
+}
+
+# Applying the function
+all_logs[,
+        session_id := sapply(.SD, time_detecter),
+        by = .(user_id, date),
+        .SDcols = "diff"]
+```
+
+
+### Game id
+
+```{r Game id}
+# Numbering the games played
+all_logs[,
+        game_id := sapply(.SD,
+                          function(item_count) {
+
+                            bin <- numeric()
+                            game <- 1
+                            x <- 0
+                            
+                            for (i in 1:length(item_count)) { #nolint
+                              
+                              if (item_count[i] == x + 1) {
+                                bin[i] <- game
+                                x <- x + 1
+                              } else {
+                                game <- game + 1
+                                bin[i] <- game
+                                x <- 1
+                              }
+                            }
+                            return(bin)
+                          }),
+        by = .(user_id, date, session_id),
+        .SDcols = "item_count"]
+```
+
+
+### MSM id
+
+```{r MSM id}
+all_logs[, msm_id := .GRP, by = .(user_id, date, session_id)]
+```
+
+### State vector
+
+Now I can make a variable which denotes the state of a player on each problem.
+
+```{r State vector}
+# This is a function which loops through the item_count variable to detect whether a player does a soft-quit within a session.
+state_maker <- function(x) {
+  
+  # I look at the difference between the item_counter variable at x and x+1 to determine whether a player switched games or not.
+  x2 <- shift(x, type = "lead", fill = -1)
+  sub <- x - x2
+  eval <- 1
+  
+  bin <- numeric()
+  
+  for (i in 1:length(sub)) { #nolint
+    # If the difference is -1 or 0 then the player is either still playing (-1) the same game or has started a game and stopped at problem 1 (0) = wrong selection quit and therefore shouldn't count.
+    if (sub[i] < 1) {
+      bin[i] <- eval
+      # A difference of 9 implies a game was finished and then they started a new game (10 - 1 = 9)
+    } else if (sub[i] == 9) {
+      eval <- 1
+      bin[i] <- eval
+    } else if (sub[i] != 9) {
+      # Otherwise it's a quit.
+      eval <- eval + 1
+      bin[i] <- eval
+    }
+  }
+  
+  # When a player does multiple soft-quits in a row, the eval counter goes beyond 2. I replace these     values with 2 here as it all counts as the soft-quit state.
+  bin[bin > 2] <- 2
+  return(bin)
+  
+}
+
+all_logs[, State := sapply(.SD, state_maker), #nolint
+        by = c("user_id", "date", "session_id"),
+        .SDcols = "item_count"]
+```
+
+```{r State vector 2}
+# In this last step the final state within each session gets determined (i.e., was it a soft-quit/hard-quit or did they stop after completing a whole game?)
+dt_1 <- all_logs[,
+                .SD[.N],
+                by = c("user_id", "date", "session_id")][item_count != 10,
+                                                         State := 3][item_count == 10, #nolint
+                                                                     State := 1] #nolint
+
+setkeyv(dt_1, cols = c("user_id", "created"))
+setkeyv(all_logs, cols = c("user_id", "created"))
+
+all_logs[dt_1, State := i.State] #nolint
+```
+
+## Sequential errors 
+
+```{r Sequential errors}
+all_logs[,
+         error_seq := sapply(.SD,
+                             function(x) {
+                               
+                               store <- numeric()
+                               count <- 0
+                               
+                               for (i in 1:length(x))
+                                 if (x[i] == 1) {
+                                   count <- 0
+                                   store[i] <- count
+                                 } else {
+                                   count <- count + 1
+                                   store[i] <- count
+                                 }
+                               return(store)
+                             }),
+         by = .(user_id, session_count),
+         .SDcols = "correct_answered"]
+
+# Make categorical sequential error variable
+# 0 = 0; 1 = 1; 2 = 2; 3 = 3; >3 = 4
+all_logs[, error_seq_cat := ifelse(error_seq == 0, 0,
+                               ifelse(error_seq == 1, 1, 
+                                      ifelse(error_seq == 2, 2, 
+                                             ifelse(error_seq == 3, 3,
+                                                    4)))), ]
+all_logs$error_seq_cat <- factor(all_logs$error_seq_cat,
+                             levels = c(0:4),
+                             labels = c("0", "1", "2", "3", ">3"))
+
+
+all_logs[, error_seq_cat_shift := shift(error_seq_cat, type = "lead"),
+        by = .(user_id,
+               date,
+               session_id,
+               game_id)]
+all_logs <- all_logs %>% fill(error_seq_cat_shift, .direction = "down")
+```
+
+## Non-deliberate quit types
+Here, we try to detect when users are not playing deliberately, and mark these cases in the data. 
+
+### Inactivity and triple error 
+```{r Inactivity and triple error, warning=FALSE}
+# Out of time counter
+# Adapt the seq error function to make a sequential out_of_time variable for the inactivity quit type
+
+ootime_counter <- function(x) {
+  store <- numeric()
+  count <- 0
+  for (i in 1:length(x))
+    if (x[i] == 0) {
+      count <- 0
+      store[i] <- count
+    } else {
+      count <- count + 1
+      store[i] <- count
+    }
+  return(store)
+}
+
+
+# Replace NA values in 'out_of_time' with 0
+all_logs[, out_of_time := ifelse(is.na(out_of_time), 0, out_of_time)]
+
+# Calculate 'ootime_seq' by user_id and session_count
+all_logs[, ootime_seq := ootime_counter(out_of_time), by = .(user_id, session_count)]
+
+
+# Apply the seq. oo time function
+all_logs <- all_logs %>%
+  mutate(out_of_time = replace_na(out_of_time, 0)) %>%
+  .[,
+    ootime_seq := sapply(.SD,
+                         ootime_counter),
+    by = .(user_id,
+           session_count),
+    .SDcols = "out_of_time"] %>%
+  setkeyv(., cols = c("user_id", "created"))
+
+```
+
+Users are automatically thrown out of the system if they make three fast mistakes in a row. Here, I am making a variable to detect these cases. 
+```{r fast incorrect, warning=FALSE}
+all_logs[, N := .N, by = .(user_id, session_count)]
+all_logs[, fast_incorrect := NA]
+all_logs[response_in_milliseconds < 3000 & correct_answered == 0, fast_incorrect := 1]
+all_logs[is.na(fast_incorrect), fast_incorrect := 0]
+
+all_logs[, fast_incorrect_counter := ootime_counter(fast_incorrect), by = .(user_id, session_count)]
+
+table(all_logs$fast_incorrect_counter)
+```
+
+```{r non-deliberate dummies}
+# Creating dummy variables to find non-deliberate game-play
+all_logs[, wrong_selection_quit := ifelse(N == 1 & response_in_milliseconds < 2500, 1, 0)]
+all_logs[, wrong_selection_quit2 := ifelse(N == 1 & question_mark == 1 & response_in_milliseconds < 8500, 1, 0)]
+all_logs[, speedy_error_quit := ifelse(fast_incorrect_counter >= 3 & lead(item_count) == 1, 1, 0)]
+all_logs[, inactivity_quit := ifelse(N < 10 & lead(item_count) == 1 & ootime_seq >= 2, 1, 0)]
+
+all_logs[wrong_selection_quit == 1 | wrong_selection_quit2 == 1 | speedy_error_quit == 1 | inactivity_quit == 1, non_deliberate := 1]
+all_logs[non_deliberate != 1, non_deliberate := 0]
+all_logs[is.na(non_deliberate), non_deliberate := 0]
+```
+
+### Errors, Fast or Slow
+
+Whether errors made were fast or slow by comparing them to the median reaction time of each player within each domain. Because this is a time dependent covariate we have to shift these values backwards as msm evaluates the value of the covariate at $t-1$ to determine its influence on the state at time $t$.
+
+```{r Errors fast or slow}
+all_logs[, 
+        Error_type :=  ifelse(response_in_milliseconds - quantile(response_in_milliseconds)[3] < 0,
+                          "Fast error",
+                          "Slow error"),
+        by = .(user_id, domain_id)]
+
+# Question mark trials do not count as an error
+all_logs[correct_answered != 0 | question_mark == 1, Error_type :=  "AAA_No error",]
+
+# Shifiting for msm
+all_logs[,Error_type := shift(Error_type, type = "lead"),
+        by = .(user_id, date, session_id)]
+all_logs <- all_logs %>% fill(Error_type, .direction = "down")
+```
+
+### Playing outside of school hours
+
+```{r Playing hours, warning=F}
+# Whether a player is playing in the weekend/evening or not
+all_logs[,weekend_evening := ifelse(weekdays(created, abbreviate = TRUE) %in% c("Sun", "Sat") | strftime(created, format="%H:%M:%S") > "16.00", 1, 0),]
+
+all_logs$weekend_evening <- as.factor(all_logs$weekend_evening)
+
+# all_logs[date > "2021-02-19" & date < "2021-03-01", weekend_evening := "1",]
+```
+
+## Data cleaning
+Deleting all sessions which lasted shorter than one whole game.
+
+```{r Mini sessions}
+mini_sessions <- all_logs %>%
+  group_by(msm_id) %>%
+  dplyr::count() %>%
+  filter(n < 10) %>%
+  pull(msm_id)
+
+all_logs <- all_logs[!msm_id %in% mini_sessions]
+rm(mini_sessions)
+```
+
+Deleting all sessions with only wrong answers.
+
+```{r Zero correct}
+zero_correct <- all_logs %>%
+  group_by(msm_id) %>%
+  summarise(prop_cor = mean(correct_answered)) %>%
+  filter(prop_cor == 0) %>%
+  select(-prop_cor) %>%
+  data.table()
+
+all_logs <- all_logs[!zero_correct, , on = .(msm_id)]
+```
+
+### Time difference column
+
+```{r Time difference}
+all_logs$created <- parse_date_time(all_logs$created, orders = "%Y:%m:%d %H:%M:%S")
+
+all_logs[order(created),
+        diff_s := round(as.numeric(created - head(created, 1),
+                                   units = "mins"), 2),
+        by = .(msm_id)]
+
+# The first of which has no x-1 which results in a NA, I replace these NA's with 0 here.
+all_logs$diff_s[is.na(all_logs$diff_s)] <- 0
+```
+
+# Save data
+
+```{r Saving dataset}
+all_logs <- data.table(all_logs)
+setkeyv(all_logs, cols = c("created", "user_id"))
+saveRDS(all_logs, file = "/home/user-048/research-collaboration/quitting_ind_differences/data/replication/replication_clean.Rdata")
+```
