@@ -16,136 +16,152 @@ knitr::opts_chunk$set(
 )
 ```
 
-This script takes the prepared data (from *replication_data_prep*) and fits the multistate survival model to it. This is an attempt to replicate the outcomes from ten Broeke et al. (2022), and therefore much of the code is replicated, and should be accredited to, the authors of this paper.
+This script takes the prepared data (from *replication_data_prep*) and fits the multistate survival model to it. This is an attempt to replicate the outcomes from ten Broeke et al. (2022), and therefore much of the code is replicated, and should be accredited to, the authors of this paper. 
 
-```{r Libraries, message=F, include=FALSE}
+```{r Load data}
 source("~/research-collaboration/quitting_ind_differences/dependencies.R")
-library(lmtest)
-```
-
-```{r Working directory, include=FALSE}
-setwd("~/research-collaboration/quitting_ind_differences/replication_multistate")
-path <- getwd()
 path_to_plots <- "~/research-collaboration/quitting_ind_differences/replication_multistate/plots"
 path_to_tables <- "~/research-collaboration/quitting_ind_differences/replication_multistate/tables"
-```
-
-# Descriptives 
-
-```{r Load data and minor cleaning}
 dat <- readRDS(paste0(path_to_data, "/replication_clean.Rdata"))
 dat <- data.table(dat)
 setkeyv(dat, cols = c("created", "user_id"))
-
-# Load domain info data
-load(paste0(path_to_data, "/domain_info.Rdata"))
-colnames(domain_info)[1] <- "domain_id"
-colnames(domain_info)[2] <- "application"
-domain_info <- data.table(domain_info)
-
-# Load user data
-load(paste0(path_to_data, "/user_info.Rdata"))
-user_info <- data.table(user_info)
-
-# Some consolidation and filtering
-# dat[is.na(non_deliberate), non_deliberate := 0]
-dat <- dat[grade > 2 & grade < 9 & non_deliberate == 0]
-dat <- dat[, grade_collapse := fct_collapse(factor(grade),
-                                                        lower_grades = c("3", "4", "5"),
-                                                        higher_grades = c("6", "7", "8"))]
-dat <- merge(dat, domain_info[, .(domain_id, application)], by = "domain_id")
-dat <- merge(dat, user_info[, .(user_id, gender)], by = "user_id")
-
-# Setting a key to ensure proper ordering
-dat <- data.table(dat)
-setkeyv(dat, c("user_id", "created"))
-
-dat$difficulty <- factor(dat$difficulty)
-dat$error_seq_cat_shift <- factor(dat$error_seq_cat_shift)
-dat$weekend_evening <- factor(dat$weekend_evening)
-
-# Specifying the order of the discretized variables explicitly to ensure correct reference category
-levels(dat$error_seq_cat_shift) <- list(`0` = "0",
-                                                      `1`  = "1",
-                                                      `2` = "2",
-                                                      `3` = "3",
-                                                      `>3` = ">3")
-levels(dat$weekend_evening) <- list(`1` = "1",
-                                          `0` = "0")
-levels(dat$difficulty) <- list(`2` = "2",
-                                     `1` = "1",
-                                     `0` = "0")
-levels(dat$grade_collapse) <- list(`higher_grades` = "higher_grades",
-                                         `lower_grades` = "lower_grades")
-levels(dat$gender) <- list(`m` = "m",
-                                 `f` = "f")
 ```
 
-## Sample size
-```{r N,echo=TRUE}
+# Descriptives 
+## Sample characteristics
+
+```{r descriptives_N}
 N <- dat[, uniqueN(user_id)]
-cat("Total Sample Size:\n")
 N
-
-N_append <- data.frame(grade = "total", 
-                       N = N)
-N_grade <- dat[, .(N = uniqueN(user_id)), by = grade][order(grade)]
-cat("Sample Size Per Grade:\n")
-N_grade 
-N_grade_with_total <- rbind(N_grade, N_append)
-write.csv(N_grade_with_total,
-       paste0(path_to_tables, "/N.csv"))
 ```
 
-There are slightly more males compared to females in the data. 
-```{r N by gender}
-ggplot(data = dat[, uniqueN(user_id), by = gender]) +
-  geom_bar(aes(x = factor(gender), y = V1), stat = "identity", color = colors[1], fill = colors[1], alpha=0.5) +
-  geom_label(aes(x = factor(gender), y = V1, label = V1), color = colors[1]) +
-  labs(x = "Gender", y = "N", title = "N per Gender") +
-  scale_x_discrete(labels = c("Female", "Male", "Not Specified")) +
-  theme_minimal()
-```
 
-## State distribution 
-Here, I examine how the frequency of being in a certain state (1, 2, or 3) varies across grade and gender in the data. 
+```{r descriptives_N per grade}
+N_grade <- dat[, .(N = uniqueN(user_id)), by = grade]
+N_grade
+write.csv(N_grade, paste0(path_to_tables, "/N_grade.csv"))
 
-```{r State distribution, fig.width=8, fig.height=4}
+dat[, .N, by = .(grade, State)][order(grade, State)]
 ggplot(data = dat[, .N, by = .(grade, State)][order(grade, State)]) +
-  geom_bar(aes(x = factor(grade), fill = factor(State), y = N), stat = "identity", position = "dodge") + 
-  labs(title = "State distribution by grade", y = "N", x = "Grade") +
-  scale_fill_manual(values = colors[1:3], name= "State") +
-  theme_minimal() 
+  geom_bar(aes(x = grade, fill = factor(State), y = N), stat = "identity", position = "dodge") + 
+  scale_fill_manual(values = colors[1:3]) +
+  theme_minimal() +
+  plot_theme
 
-ggplot(data = dat[!is.na(gender), .N, by = .(gender, State)][order(gender, State)]) +
+```
+
+```{r descriptives_Gender}
+dat[is.na(gender), gender := "not_specified"]
+dat[, .N, by = gender]
+
+dat[, .N, by = .(gender, State)][order(gender, State)]
+ggplot(data = dat[, .N, by = .(gender, State)][order(gender, State)]) +
   geom_bar(aes(x = gender, fill = factor(State), y = N), stat = "identity", position = "dodge") + 
-  labs(title = "State distribution by gender", y = "N", x = "Gender") +
-  scale_fill_manual(values = colors[1:3], name = "State") +
-  theme_minimal()
+  scale_fill_manual(values = colors[1:3]) +
+  theme_minimal() +
+  plot_theme
 ```
 
-## Number of sessions completed
-The majority of users have completed 1-10 full sessions. This ranges from 1 to 945 completed sessions. 
 
-```{r Session distribution }
+```{r descriptives_N sessions}
 # Number of sessions played
-ggplot(dat[item_count == 10, .N, by = user_id], aes(x = N)) +
-  geom_histogram(color = colors[2], fill = colors[2], alpha=0.5, bins = 200) +
+ggplot(dat[, .N, by = user_id], aes(x = N)) +
+  geom_histogram(color = colors[2], fill = colors[2], alpha=0.5, bins = 100) +
   labs(x = "N per user",
-       title = "Distribution of number of sessions completed") +
-  theme_minimal()
+       title = "Distribution of number of sessions played") +
+  theme_minimal() +
+  theme(legend.position = "right",
+        plot.title = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) + plot_theme
 ```
 
-## Sequential errors 
-There is a large amount of errors (sequential errors = 1), but the frequency of 2, 3, and more than 3 sequential errors gradually decreases. 
-
-```{r Distribution sequential errors }
-ggplot(data = dat[, .N, by = error_seq_cat]) +
-  geom_bar(aes(x = error_seq_cat, y = N), stat = "identity", position = "dodge",
-           color = colors[1], fill = colors[1], alpha=0.5) + 
-  labs(title = "Frequency of Sequential Errors") +
-  theme_minimal()
+### State
+```{r desriptives_State}
+dat[, .N, by = .(correct_answered, State)]
+ggplot(data = dat[, .N, by = .(correct_answered, State)]) +
+  geom_bar(aes(x =factor(correct_answered), fill = factor(State), y = N), stat = "identity", position = "dodge") + 
+  scale_fill_manual(values = colors) +
+  theme_minimal() +
+  plot_theme
 ```
+
+### Sequential errors 
+```{r descriptives_Sequential errors}
+dat[error_seq_cat != "0", .N, by = .(gender, error_seq_cat)][order(gender, error_seq_cat)]
+dat[error_seq_cat != "0", .N, by = .(grade, error_seq_cat)][order(grade, error_seq_cat)]
+dat[error_seq_cat != "0", .N, by = .(State, error_seq_cat)][order(State, error_seq_cat)]
+
+ggplot(data = dat[error_seq_cat != "0", .N, by = .(gender, error_seq_cat)][order(gender, error_seq_cat)]) +
+  geom_bar(aes(x = gender, fill = factor(error_seq_cat), y = N), stat = "identity", position = "dodge") + 
+  scale_fill_manual(values = colors) +
+  theme_minimal() +
+  plot_theme
+
+ggplot(data = dat[error_seq_cat != "0", .N, by = .(grade, error_seq_cat)][order(grade, error_seq_cat)]) +
+  geom_bar(aes(x = factor(grade), fill = factor(error_seq_cat), y = N), stat = "identity", position = "dodge") + 
+  scale_fill_manual(values = colors) +
+  theme_minimal() +
+  plot_theme
+
+ggplot(data = dat[error_seq_cat != "0", .N, by = .(State, error_seq_cat)][order(State, error_seq_cat)]) +
+  geom_bar(aes(x = factor(State), fill = factor(error_seq_cat), y = N), stat = "identity", position = "dodge") + 
+  scale_fill_manual(values = colors) +
+  theme_minimal() +
+  plot_theme
+```
+
+### Fast vs. slow Errors
+
+```{r descriptives_Fast vs slow errors}
+dat[Error_type != "AAA_No error", .N, by = .(gender, Error_type)][order(gender, Error_type)]
+dat[Error_type != "AAA_No error", .N, by = .(grade, Error_type)][order(grade, Error_type)]
+dat[Error_type != "AAA_No error", .N, by = .(State, Error_type)][order(State, Error_type)]
+
+ggplot(data = dat[Error_type != "AAA_No error", .N, by = .(gender, Error_type)][order(gender, Error_type)]) +
+  geom_bar(aes(x = gender, fill = factor(Error_type), y = N), stat = "identity", position = "dodge") + 
+  scale_fill_manual(values = colors[1:2]) +
+  theme_minimal() +
+  plot_theme
+
+ggplot(data = dat[Error_type != "AAA_No error", .N, by = .(grade, Error_type)][order(grade, Error_type)]) +
+  geom_bar(aes(x = factor(grade), fill = factor(Error_type), y = N), stat = "identity", position = "dodge") + 
+  scale_fill_manual(values = colors) +
+  theme_minimal() +
+  plot_theme
+
+ggplot(data = dat[Error_type != "AAA_No error", .N, by = .(State, Error_type)][order(State, Error_type)]) +
+  geom_bar(aes(x = factor(State), fill = factor(Error_type), y = N), stat = "identity", position = "dodge") + 
+  scale_fill_manual(values = colors) +
+  theme_minimal() +
+  plot_theme
+```
+
+### Playing during school hours 
+
+```{r descriptives_playing time}
+dat[, .N, by = .(gender, weekend_evening)][order(gender, weekend_evening)]
+dat[, .N, by = .(grade, weekend_evening)][order(grade, weekend_evening)]
+dat[, .N, by = .(State, weekend_evening)][order(State, weekend_evening)]
+
+ggplot(data = dat[, .N, by = .(gender, Error_type)][order(gender, Error_type)]) +
+  geom_bar(aes(x = gender, fill = factor(Error_type), y = N), stat = "identity", position = "dodge") + 
+  scale_fill_manual(values = colors) +
+  theme_minimal() +
+  plot_theme
+
+ggplot(data = dat[, .N, by = .(grade, weekend_evening)][order(grade, weekend_evening)]) +
+  geom_bar(aes(x = factor(grade), fill = factor(weekend_evening), y = N), stat = "identity", position = "dodge") + 
+  scale_fill_manual(values = colors) +
+  theme_minimal() +
+  plot_theme
+
+ggplot(data = dat[, .N, by = .(State, weekend_evening)][order(State, weekend_evening)]) +
+  geom_bar(aes(x = factor(State), fill = factor(weekend_evening), y = N), stat = "identity", position = "dodge") + 
+  scale_fill_manual(values = colors) +
+  theme_minimal() +
+  plot_theme
+```
+
 
 # Multistate Survial Model 
 ## Transition matrix
@@ -166,11 +182,11 @@ Q
 
 ## Model fitting
 
-The model fit procedures are specified in a separate script, *"modelfit_msm.R"*. The outputs from that model fitting have been saved and can be loaded into the environment below.
+The model fit procedures are specified in a separate script, <modelfit_msm.R>. The outputs from that model fitting have been saved and can be loaded into the environment below.
 
-*msm_constrained_all*, *msm_constrained_rt* and *msm_constrained_tz* are the constrained models. That is, the multistate models without any covariates added.
+<msm_constrained_all>, <msm_constrained_rt> and <msm_constrained_tz> are the constrained models. That is, the multistate models without any covariates added.
 
-*msm_covariate_all*, *msm_covariate_rt* and *msm_covariate_tz* are the covariate models. The following covariates were added to these models:
+<msm_covariate_all>, <msm_covariate_rt> and <msm_covariate_tz> are the covariate models. The following covariates were added to these models:
 
 -   Gender
 
@@ -184,7 +200,7 @@ The model fit procedures are specified in a separate script, *"modelfit_msm.R"*.
 
 -   Sequential errors (vs. no error: 1, 2, 3, \>3)
 
-*hr_msm_covariate_rt* and *hr_msm_covariate_tz* specify the transition probabilities for each covariate (hazard ratios) in the rekentuin and taalzee models, respectively.
+<hr_msm_covariate_rt> and <hr_msm_covariate_tz> specify the transition probabilities for each covariate (hazard ratios) in the rekentuin and taalzee models, respectively.
 
 ```{r MSM fit, warning = FALSE, include=FALSE}
 # Run this to fit the model to the data. 

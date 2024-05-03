@@ -13,10 +13,10 @@ Persisting to Soft-Quit,"Slow error
  vs. No error",0.846,"[ 0.811 , 0.882 ]"
 Persisting to Soft-Quit,"During school 
  vs. Outside school",1.39,"[ 1.321 , 1.462 ]"
-Persisting to Soft-Quit,"High diff 
- vs. Medium diff",1.093,"[ 1.049 , 1.138 ]"
-Persisting to Soft-Quit,"High diff 
- vs. Low diff",1.215,"[ 1.167 , 1.265 ]"
+Persisting to Soft-Quit,"Low vs.High 
+ Difficulty Level",1.093,"[ 1.049 , 1.138 ]"
+Persisting to Soft-Quit,"Medium vs. High 
+ Difficulty Level",1.215,"[ 1.167 , 1.265 ]"
 Persisting to Soft-Quit,"Higer grades  
  vs. Lower grades",1.324,"[ 1.285 , 1.364 ]"
 Persisting to Soft-Quit,"Girls  
@@ -35,10 +35,10 @@ Persisting to Hard-Quit,"Slow error
  vs. No error",1.013,"[ 0.951 , 1.078 ]"
 Persisting to Hard-Quit,"During school 
  vs. Outside school",2.584,"[ 2.344 , 2.848 ]"
-Persisting to Hard-Quit,"High diff 
- vs. Medium diff",1.032,"[ 0.971 , 1.097 ]"
-Persisting to Hard-Quit,"High diff 
- vs. Low diff",1.082,"[ 1.019 , 1.149 ]"
+Persisting to Hard-Quit,"Low vs.High 
+ Difficulty Level",1.032,"[ 0.971 , 1.097 ]"
+Persisting to Hard-Quit,"Medium vs. High 
+ Difficulty Level",1.082,"[ 1.019 , 1.149 ]"
 Persisting to Hard-Quit,"Higer grades  
  vs. Lower grades",1.252,"[ 1.197 , 1.309 ]"
 Persisting to Hard-Quit,"Girls  

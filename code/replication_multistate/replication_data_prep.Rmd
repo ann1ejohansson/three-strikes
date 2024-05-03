@@ -1,5 +1,5 @@
 ---
-title: "Replication Data"
+title: "Preparation of Replication Data"
 output: html_document
 date: "2023-07-28"
 ---
@@ -7,14 +7,7 @@ date: "2023-07-28"
 This script loads the raw 2-month Oefenweb data and prepares it for the main replication analysis.
 
 ```{r Directory and libraries, warning = FALSE, message = FALSE}
-setwd("/home/user-048/research-collaboration/quitting_ind_differences/data_prep")
-path <- getwd()
-
-library(tidyverse) 
-library(dplyr)
-library(data.table)
-library(lubridate)
-library(slider)
+source("~/research-collaboration/quitting_ind_differences/dependencies.R")
 ```
 
 # Loading data
@@ -332,6 +325,7 @@ all_logs[, inactivity_quit := ifelse(N < 10 & lead(item_count) == 1 & ootime_seq
 all_logs[wrong_selection_quit == 1 | wrong_selection_quit2 == 1 | speedy_error_quit == 1 | inactivity_quit == 1, non_deliberate := 1]
 all_logs[non_deliberate != 1, non_deliberate := 0]
 all_logs[is.na(non_deliberate), non_deliberate := 0]
+table(all_logs$non_deliberate)
 ```
 
 ### Errors, Fast or Slow
@@ -348,7 +342,7 @@ all_logs[,
 # Question mark trials do not count as an error
 all_logs[correct_answered != 0 | question_mark == 1, Error_type :=  "AAA_No error",]
 
-# Shifiting for msm
+# Shifting for msm
 all_logs[,Error_type := shift(Error_type, type = "lead"),
         by = .(user_id, date, session_id)]
 all_logs <- all_logs %>% fill(Error_type, .direction = "down")
@@ -374,7 +368,6 @@ mini_sessions <- all_logs %>%
   dplyr::count() %>%
   filter(n < 10) %>%
   pull(msm_id)
-
 all_logs <- all_logs[!msm_id %in% mini_sessions]
 rm(mini_sessions)
 ```
@@ -386,10 +379,57 @@ zero_correct <- all_logs %>%
   group_by(msm_id) %>%
   summarise(prop_cor = mean(correct_answered)) %>%
   filter(prop_cor == 0) %>%
-  select(-prop_cor) %>%
   data.table()
 
 all_logs <- all_logs[!zero_correct, , on = .(msm_id)]
+```
+
+```{r Final cleaning}
+# Load domain info data
+load(paste0(path_to_data, "/domain_info.Rdata"))
+colnames(domain_info)[1] <- "domain_id"
+colnames(domain_info)[2] <- "application"
+domain_info <- data.table(domain_info)
+
+# Load user data
+load(paste0(path_to_data, "/user_info.Rdata"))
+user_info <- data.table(user_info)
+
+# Include only users in grade 3-8 with deliberate gameplay  
+all_logs <- all_logs[grade > 2 & grade < 9 & non_deliberate == 0]
+
+# Categorical grade variable 
+all_logs <- all_logs[, grade_collapse := fct_collapse(factor(grade),
+                                                        lower_grades = c("3", "4", "5"),
+                                                        higher_grades = c("6", "7", "8"))]
+
+# Add domain and user info to dataset
+all_logs <- merge(all_logs, domain_info[, .(domain_id, application)], by = "domain_id")
+all_logs <- merge(all_logs, user_info[, .(user_id, gender)], by = "user_id")
+
+# Setting a key to ensure proper ordering
+all_logs <- data.table(all_logs)
+setkeyv(all_logs, c("user_id", "created"))
+
+all_logs$difficulty <- factor(all_logs$difficulty)
+all_logs$error_seq_cat_shift <- factor(all_logs$error_seq_cat_shift)
+all_logs$weekend_evening <- factor(all_logs$weekend_evening)
+
+# Specifying the order of the discretized variables explicitly to ensure correct reference category
+levels(all_logs$error_seq_cat_shift) <- list(`0` = "0",
+                                                      `1`  = "1",
+                                                      `2` = "2",
+                                                      `3` = "3",
+                                                      `>3` = ">3")
+levels(all_logs$weekend_evening) <- list(`1` = "1",
+                                          `0` = "0")
+levels(all_logs$difficulty) <- list(`2` = "2",
+                                     `1` = "1",
+                                     `0` = "0")
+levels(all_logs$grade_collapse) <- list(`higher_grades` = "higher_grades",
+                                         `lower_grades` = "lower_grades")
+levels(all_logs$gender) <- list(`m` = "m",
+                                 `f` = "f")
 ```
 
 ### Time difference column
@@ -411,5 +451,5 @@ all_logs$diff_s[is.na(all_logs$diff_s)] <- 0
 ```{r Saving dataset}
 all_logs <- data.table(all_logs)
 setkeyv(all_logs, cols = c("created", "user_id"))
-saveRDS(all_logs, file = "/home/user-048/research-collaboration/quitting_ind_differences/data/replication/replication_clean.Rdata")
+saveRDS(all_logs, file = paste0(path_to_data, "/replication_clean.Rdata"))
 ```
