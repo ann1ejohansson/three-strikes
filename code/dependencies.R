@@ -7,6 +7,9 @@ library(tidyverse)
 library(data.table)
 library(lubridate)
 library(slider)
+library(forcats)
+library(dplyr)
+library(tidyr)
 
 # Plotting tools
 library(ggpubr)
@@ -73,13 +76,20 @@ alpha = 0.4
 # ---------------------------------------------------------------------------- #
 # Functions                                                                    #
 # ---------------------------------------------------------------------------- #
-export_plot <- function(plot_object, height = 600, width = 800) {
+export_png <- function(plot_object, height = 600, width = 800, res = 80) {
   png(filename = paste0(path_to_plots, "/", deparse(substitute(plot_object)), ".png"),
       height = height,
       width = width,
-      res = 80)
+      res = res)
   print(plot_object)
   dev.off()
 }
 
+export_pdf <- function(plot_object, height = 10, width = 12) {
+  pdf(file = paste0(path_to_plots, "/", deparse(substitute(plot_object)), ".pdf"),
+      height = height,
+      width = width)
+  print(plot_object)
+  dev.off()
+}
 
