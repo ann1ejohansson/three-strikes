@@ -1,0 +1,578 @@
+---
+title: "Analysis on Subtraction Data"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    keep_tex: yes
+---
+
+This document is intended for the analysis of individual differences in the effect of sequential errors on quitting, in the subtraction game within Prowise Learn. It is accompanied by other scripts needed to properly analyse the data:  
+
+*  <load_subtraction_data.R> to load in the raw subtraction data. 
+*  <subtraction_data_prep.Rmd> to clean the raw data and compute the necessary variables.  
+*  <fit_mm_sub.R> to run the simple Markov models on the subtraction data.  
+*  <fit_lmer_subtraction.R> to fit the mixed-effect logistic regression model to the subtraction data.  
+
+When compiling, plots are saved, in LaTeX-friendly format, to the folder <ind_diff_subtraction_files>. This document also compiles into a pdf document: ind_diff_subtraction.pdf. 
+
+
+```{r Set-up, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  # fig.width = 8,
+  # fig.height = 4,
+  fig.align = "left",
+  out.width = "100%", 
+  tidy = TRUE
+)
+```
+
+First, I load in the data that was prepped in the script <subtraction_data_prep.Rmd>.  
+
+```{r Load data 1, include=TRUE, message=FALSE, warning=FALSE}
+source("~/research-collaboration/quitting_ind_differences/dependencies.R")
+dat <- readRDS(paste0(path_to_data, "/subtraction_clean.RData"))
+dat <- as.data.table(dat)
+path_to_tables <- "~/research-collaboration/quitting_ind_differences/ind_diff_subtraction/tables"
+path_to_plots <- "~/research-collaboration/quitting_ind_differences/ind_diff_subtraction/plots"
+path_to_models <- "~/research-collaboration/quitting_ind_differences/ind_diff_subtraction/models"
+```
+
+I look only at gameplay that we consider to be deliberate. Exclusion criteria:  
+
+(1) sessions where the game was started but exited immediately; (2) sessions with long sequences of incorrect responses; or (3) sessions with three fast incorrect responses in a row (as detected by the system, resulting in an automatic ending of a game).  
+
+We also excluded users in grades 1 and 2, as most games are not suited for children in this age, thus they provide very little data.
+
+```{r Data exclusion }
+# Remove non-deliberate gameplay
+dat <- dat[is.na(non_deliberate), non_deliberate := 0]
+dat <- dat[!non_deliberate == 1]
+# This causes some users to have just one observation. Removing these
+dat <- dat[!user_id %in% dat[, .N, by = user_id][N == 1]$user_id]
+
+# Remove users in grades 1 & 2
+dat <- dat[grade > 2]
+```
+
+# Sample characteristics 
+
+Total sample size and sample size per grade:  
+```{r N}
+N <- dat[grade>2, uniqueN(user_id)]
+cat("Total Sample Size:\n")
+N 
+
+N_append <- data.frame(grade = "total", 
+                       N = N)
+
+N_grade <- dat[grade>2, .(grade = min(grade)), by = user_id][, .N, by = grade][order(grade)]
+N_grade
+
+N_grade_with_total <- rbind(N_grade, N_append)
+write.csv(N_grade_with_total,
+       paste0(path_to_tables, "/mm_N.csv"))
+```
+
+How many sessions, on average, were quit prematurely? 
+```{r Average quit rate}
+dat[, quit_session := ifelse(N < 10, 1, 0)]
+dat[, user_session := paste(user_id, session_count, sep = "-")]
+quit_count <- dat[, .(quit_session = unique(quit_session)), by = user_session]
+cat("Average quit rate, subtraction data:", mean(quit_count$quit_session))
+```
+
+# 2-State Markov model
+In the addition data, the model including all possible covariates and their interactions with sequential errors was the best-fitting model. Therefore, I fit the same model to the subtraction data. The Markov Model is fitted in an external script, <fit_mm_sub.R>
+
+Variables are defined in the following manner:  
+
+*  error_seq = Sequential errors. How many errors have been committed in a row? Categorical variable with 5 levels: 0, 1, 2, 3, >3.  
+*  difficulty = What is the predicted probability that the next item will be correct, for the individual player? Categorical variable with 3 levels: 0 = easy (90% correct), 1 = medium (75% correct), 2 = difficult (60% correct).  
+*  weekend_evening = Playing during school hours. Did the user play during school hours, or in the weekend/evening? Binary variable: 0 = school-time, 1 = weekend or evening hours.  
+*  grade = What school grade is the user enrolled in? Categorical variable with 3 levels: 3-4, 5-6, 7-8.  
+*  RT = Response time. Was the response slow (0) or fast (1)? Computed based on median response time (faster than median = fast, and vice versa). 
+
+
+```{r Load 2-state Model, eval = FALSE}
+mm_full <- readRDS(paste0(path_to_models, "/mm_full.Rdata"))
+```
+
+## Transition rates 
+The Q-matrix represents the transition intensities between different states in a Markov model, indicating the instantaneous rate at which transitions occur from one state to another.  
+The P-matrix represents the transition probabilities over 10 items in a session. This is derived from the Q-matrix, showing the likelihood of moving from one state to another within this interval.  
+
+```{r Save Transition Intensities and Probabilities, eval = FALSE }
+saveRDS(mm_full$Qmatrices$baseline, paste0(path_to_tables, "/q_matrix_sub.Rdata"))
+saveRDS(pmatrix.msm(mm_full, t = 10), paste0(path_to_tables, "/p_matrix_sub.Rdata"))
+```
+
+
+```{r Transition Intensities and Probabilities }
+q_matrix <- readRDS(paste0(path_to_tables, "/q_matrix_sub.Rdata"))
+p_matrix <- readRDS(paste0(path_to_tables, "/p_matrix_sub.Rdata"))
+
+cat("Baseline transition Intensities and Probabilities for the 2-State Markov Model \n")
+cat("(When seq. errors = 0, difficulty = medium, grade = 7-8, RT = slow, and play hours = schooltime) \n\n")
+
+cat("Q-Matrix\n")
+q_matrix
+cat("\nP-Matrix\n")
+p_matrix
+```
+
+In the subtraction domain, there is an instantaneous probability of quitting of 1.5% when all covariates are controlled for. 
+
+## Hazard ratios 
+Hazard ratios are derived from the proportional hazards model, and represent the relative risk of transitioning from a persisting into a quitting state, between two groups, each differing by one unit of a covariate, while holding all other variables constant. In this model, we derive main effects hazards ratios (the relative increase in risk of a state transition given one value of a covariate) and interaction effect hazard ratios (the relative risk of a state transition given one value of a covariate, across each level of sequential errors.)
+
+### Main effects 
+```{r Dataframe Main effects, eval = FALSE}
+hr <- hazard.msm(mm_full)
+df_hr <- data.frame(cov = factor(c("1 vs. 0", "2 vs. 0", "3 vs. 0", ">3 vs. 0", 
+                                       "fast", "inside school hours", 
+                                       "grade5-6", "grade3-4", 
+                                       "easy", "difficult"),
+                                     levels = c("1 vs. 0", "2 vs. 0", "3 vs. 0", ">3 vs. 0", 
+                                       "fast", "inside school hours", 
+                                       "grade5-6", "grade3-4", 
+                                       "easy", "difficult"),
+                                     labels = c("1 vs. 0 \nSequential Errors", 
+                                                    "2 vs. 0 \nSequential Errors", 
+                                                    "3 vs. 0 \nSequential Errors", 
+                                                    ">3 vs. 0 \nSequential Errors", 
+                                                    "Fast vs. Slow \nResponse Time",
+                                                    "During vs. Outside \nSchool Hours",
+                                                    "Grade 5-6 vs. \nGrade 7-8",
+                                                    "Grade 3-4 vs. \nGrade 7-8",
+                                                    "Easy vs. Medium \nDifficulty Level", 
+                                                    "Difficult vs. Medium \nDifficulty Level")
+                                     ),
+                            hr = c(hr$error_seq_cat_shift1[1], 
+                                   hr$error_seq_cat_shift2[1],
+                                   hr$error_seq_cat_shift3[1],
+                                   hr$`error_seq_cat_shift>3`[1],
+                                   hr$RTFast[1],
+                                   hr$weekend_evening1[1], 
+                                   hr$`grade_cat5-6`[1],
+                                   hr$`grade_cat3-4`[1],
+                                   hr$difficulty0[1],
+                                   hr$difficulty2[1]),
+                            ci_l = c(hr$error_seq_cat_shift1[2], 
+                                   hr$error_seq_cat_shift2[2],
+                                   hr$error_seq_cat_shift3[2],
+                                   hr$`error_seq_cat_shift>3`[2],
+                                   hr$RTFast[2],
+                                   hr$weekend_evening1[2], 
+                                   hr$`grade_cat5-6`[2],
+                                   hr$`grade_cat3-4`[2],
+                                   hr$difficulty0[2],
+                                   hr$difficulty2[2]),
+                            ci_u = c(hr$error_seq_cat_shift1[3], 
+                                   hr$error_seq_cat_shift2[3],
+                                   hr$error_seq_cat_shift3[3],
+                                   hr$`error_seq_cat_shift>3`[3],
+                                   hr$RTFast[3],
+                                   hr$weekend_evening1[3], 
+                                   hr$`grade_cat5-6`[3],
+                                   hr$`grade_cat3-4`[3],
+                                   hr$difficulty0[3],
+                                   hr$difficulty2[3]
+                                   )
+                            )
+
+write.csv(df_hr, paste0(path_to_tables, "/hr_full_sub.csv"))
+```
+
+
+```{r Plot Main effects}
+df_hr <- read.csv(paste0(path_to_tables, "/hr_full_sub.csv"))
+plot_main <- ggplot(df_hr, aes(x = cov, y = hr)) +
+  geom_hline(yintercept = 1, linetype = "dashed", color = colors[5]) +
+  geom_linerange(aes(ymin = ci_l, ymax = ci_u), color = colors[1], alpha = alpha, linewidth = linesize) +
+  geom_point(color = colors[1], size = pointsize) +
+  geom_text(
+    aes(x = cov, y = hr, label = round(hr, 2)),
+    vjust = -0.8,
+    color = colors[4],
+    size = 3) +
+  coord_flip() +
+  labs(x = "Covariate", y = "Hazard Ratio") +
+  plot_theme
+plot_main
+```
+
+And displayed in a log scale: 
+```{r Plot main effects log scale}
+plot_main_log <- plot_main + scale_y_log10()
+plot_main_log
+```
+
+### Interaction effects 
+```{r, fig.width=14, fig.height=12, eval = FALSE}
+error_seq = c("1", "2", "3", ">3")
+df_hr_int <- data.frame(error_seq = factor(rep(error_seq, 6),
+                                           levels = error_seq),
+                        var = rep(factor(c("fast", 
+                                           "easy", "difficult", 
+                                           "grade3-4", "grade5-6",
+                                           "inside school hours"
+                                           ),
+                                         levels = 
+                                           c("fast", 
+                                             "easy", "difficult", 
+                                             "grade3-4", "grade5-6",
+                                             "inside school hours"
+                                             ),
+                                         labels = 
+                                           c("Fast vs. Slow", 
+                                             "Easy vs. Medium", "Difficult vs. Medium",
+                                             "3-4 vs. 7-8", "5-6 vs. 7-8",
+                                             "During vs. Outside"
+                                             )), 
+                                  each = 4),
+                        group = c(rep("Response Time", 4), 
+                                  rep("Difficulty", 8), rep("Grade", 8),
+                                  rep("School hours", 4)),
+           hr = c(hr$`error_seq_cat_shift1:RTFast`[1],
+                  hr$`error_seq_cat_shift2:RTFast`[1],
+                  hr$`error_seq_cat_shift3:RTFast`[1],
+                  hr$`error_seq_cat_shift>3:RTFast`[1],
+                  hr$`error_seq_cat_shift1:difficulty0`[1],
+                  hr$`error_seq_cat_shift2:difficulty0`[1],
+                  hr$`error_seq_cat_shift3:difficulty0`[1],
+                  hr$`error_seq_cat_shift>3:difficulty0`[1],
+                  hr$`error_seq_cat_shift1:difficulty2`[1],
+                  hr$`error_seq_cat_shift2:difficulty2`[1],
+                  hr$`error_seq_cat_shift3:difficulty2`[1],
+                  hr$`error_seq_cat_shift>3:difficulty2`[1],
+                  hr$`error_seq_cat_shift1:grade_cat3-4`[1],
+                  hr$`error_seq_cat_shift2:grade_cat3-4`[1],
+                  hr$`error_seq_cat_shift3:grade_cat3-4`[1],
+                  hr$`error_seq_cat_shift>3:grade_cat3-4`[1],
+                  hr$`error_seq_cat_shift1:grade_cat5-6`[1],
+                  hr$`error_seq_cat_shift2:grade_cat5-6`[1],
+                  hr$`error_seq_cat_shift3:grade_cat5-6`[1],
+                  hr$`error_seq_cat_shift>3:grade_cat5-6`[1],
+                  hr$`error_seq_cat_shift1:weekend_evening1`[1],
+                  hr$`error_seq_cat_shift2:weekend_evening1`[1],
+                  hr$`error_seq_cat_shift3:weekend_evening1`[1],
+                  hr$`error_seq_cat_shift>3:weekend_evening1`[1]
+                  ),
+           ci_l = c(hr$`error_seq_cat_shift1:RTFast`[2],
+                  hr$`error_seq_cat_shift2:RTFast`[2],
+                  hr$`error_seq_cat_shift3:RTFast`[2],
+                  hr$`error_seq_cat_shift>3:RTFast`[2],
+                  hr$`error_seq_cat_shift1:difficulty0`[2],
+                  hr$`error_seq_cat_shift2:difficulty0`[2],
+                  hr$`error_seq_cat_shift3:difficulty0`[2],
+                  hr$`error_seq_cat_shift>3:difficulty0`[2],
+                  hr$`error_seq_cat_shift1:difficulty2`[2],
+                  hr$`error_seq_cat_shift2:difficulty2`[2],
+                  hr$`error_seq_cat_shift3:difficulty2`[2],
+                  hr$`error_seq_cat_shift>3:difficulty2`[2],
+                  hr$`error_seq_cat_shift1:grade_cat3-4`[2],
+                  hr$`error_seq_cat_shift2:grade_cat3-4`[2],
+                  hr$`error_seq_cat_shift3:grade_cat3-4`[2],
+                  hr$`error_seq_cat_shift>3:grade_cat3-4`[2],
+                  hr$`error_seq_cat_shift1:grade_cat5-6`[2],
+                  hr$`error_seq_cat_shift2:grade_cat5-6`[2],
+                  hr$`error_seq_cat_shift3:grade_cat5-6`[2],
+                  hr$`error_seq_cat_shift>3:grade_cat5-6`[2],
+                  hr$`error_seq_cat_shift1:weekend_evening1`[2],
+                  hr$`error_seq_cat_shift2:weekend_evening1`[2],
+                  hr$`error_seq_cat_shift3:weekend_evening1`[2],
+                  hr$`error_seq_cat_shift>3:weekend_evening1`[2]
+                  ),
+           ci_u = c(hr$`error_seq_cat_shift1:RTFast`[3],
+                  hr$`error_seq_cat_shift2:RTFast`[3],
+                  hr$`error_seq_cat_shift3:RTFast`[3],
+                  hr$`error_seq_cat_shift>3:RTFast`[3],
+                  hr$`error_seq_cat_shift1:difficulty0`[3],
+                  hr$`error_seq_cat_shift2:difficulty0`[3],
+                  hr$`error_seq_cat_shift3:difficulty0`[3],
+                  hr$`error_seq_cat_shift>3:difficulty0`[3],
+                  hr$`error_seq_cat_shift1:difficulty2`[3],
+                  hr$`error_seq_cat_shift2:difficulty2`[3],
+                  hr$`error_seq_cat_shift3:difficulty2`[3],
+                  hr$`error_seq_cat_shift>3:difficulty2`[3],
+                  hr$`error_seq_cat_shift1:grade_cat3-4`[3],
+                  hr$`error_seq_cat_shift2:grade_cat3-4`[3],
+                  hr$`error_seq_cat_shift3:grade_cat3-4`[3],
+                  hr$`error_seq_cat_shift>3:grade_cat3-4`[3],
+                  hr$`error_seq_cat_shift1:grade_cat5-6`[3],
+                  hr$`error_seq_cat_shift2:grade_cat5-6`[3],
+                  hr$`error_seq_cat_shift3:grade_cat5-6`[3],
+                  hr$`error_seq_cat_shift>3:grade_cat5-6`[3],
+                  hr$`error_seq_cat_shift1:weekend_evening1`[3],
+                  hr$`error_seq_cat_shift2:weekend_evening1`[3],
+                  hr$`error_seq_cat_shift3:weekend_evening1`[3],
+                  hr$`error_seq_cat_shift>3:weekend_evening1`[3]
+                  )
+           )
+
+write.csv(df_hr_int, paste0(path_to_tables, "/hr_full_int.csv"))
+```
+
+```{r Interaction plot v2, fig.width = 8, fig.height = 10, include=FALSE}
+df_hr_int <- read.csv(paste0(path_to_tables, "/hr_full_int.csv"))
+
+library(patchwork)
+create_plot <- function(df, group) {
+  gg <- ggplot(data = df[df$group == group,], aes(x = error_seq, y = hr, color = var)) +
+    geom_hline(yintercept = 1, linetype = "dashed", color = colors[6]) +
+    geom_linerange(aes(ymin = ci_l, ymax = ci_u), alpha = alpha, linewidth = linesize) +
+    geom_point(size = pointsize) +
+    scale_color_manual(values = colors[2:3], name = NULL) +
+    coord_flip() +
+    labs(title = group, x = NULL, y = NULL) +
+    plot_theme +
+    facet_wrap(~group) +
+    theme(legend.position = "bottom",
+          legend.direction = "vertical")
+          # legend.text = element_text(color = colors[4], size = 10),
+          # strip.background = element_rect(fill = colors[6], color = colors[4]),
+          # strip.text = element_text(color = colors[4], size = 10),
+          # panel.border = element_rect(color = colors[4], fill = NA, linewidth = 0.5))
+    
+  return(gg)
+}
+
+plot_response_time <- create_plot(df_hr_int, "Response Time") 
+plot_difficulty <- create_plot(df_hr_int, "Difficulty")
+plot_grade <- create_plot(df_hr_int, "Grade")
+plot_hours <- create_plot(df_hr_int, "School hours")
+
+plot_response_time_log <- create_plot(df_hr_int, "Response Time") + scale_y_log10()
+plot_difficulty_log <- create_plot(df_hr_int, "Difficulty") + scale_y_log10()
+plot_grade_log <- create_plot(df_hr_int, "Grade") + scale_y_log10()
+plot_hours_log <- create_plot(df_hr_int, "School hours") + scale_y_log10()
+
+# Arrange plots using patchwork
+plots <- plot_response_time + xlab("Sequential Errors") + plot_hours + plot_difficulty + xlab("Sequential Errors") + ylab("Hazard Ratio") + plot_grade + ylab("Hazard Ratio") +
+  plot_layout(ncol = 2, byrow = TRUE)
+
+plots_log <- plot_response_time_log + xlab("Sequential Errors") + plot_hours_log + plot_difficulty_log + xlab("Sequential Errors") + ylab("Hazard Ratio") + plot_grade_log + ylab("Hazard Ratio") +
+  plot_layout(ncol = 2, byrow = TRUE)
+```
+
+
+```{r Interaction plot, fig.width = 8, fig.height = 10}
+# Define plots grid
+plots_grid <- grid.arrange(
+  plot_response_time + xlab("Sequential Errors"), plot_hours, 
+  plot_difficulty + xlab("Sequential Errors") + ylab("Hazard Ratio"), plot_grade + ylab("Hazard Ratio"),
+  ncol = 2
+)
+
+plots_grid_log <- grid.arrange(
+  plot_response_time_log + xlab("Sequential Errors"), plot_hours_log, 
+  plot_difficulty_log + xlab("Sequential Errors") + ylab("Hazard Ratio"), plot_grade_log + ylab("Hazard Ratio"),
+  ncol = 2
+)
+```
+
+
+```{r Interaction plot v2 Grid2, fig.width = 12, fig.height = 6}
+# Combine plots into a single grid
+grid.arrange(plot_main, plots_grid, ncol = 2, widths = c(2, 3))
+grid.arrange(plot_main_log, plots_grid_log, ncol = 2, widths = c(2, 3))
+
+```
+
+
+
+```{r Cleaning, eval=FALSE}
+# Remove whole environment and restart session
+rm(list = ls()); gc()
+```
+
+# Longitudinal effects: Error-induced quitting over time
+
+```{r Load data 2, message=FALSE, warning=FALSE}
+source("~/research-collaboration/quitting_ind_differences/dependencies.R")
+dat <- readRDS(paste0(path_to_data, "/subtraction_clean.RData"))
+dat <- as.data.table(dat)
+dat <- dat[is.na(non_deliberate), non_deliberate := 0]
+dat <- dat[!non_deliberate == 1]
+dat <- dat[!user_id %in% dat[, .N, by = user_id][N == 1]$user_id]
+dat <- dat[grade > 2]
+
+path_to_tables <- "~/research-collaboration/quitting_ind_differences/ind_diff_subtraction/tables"
+path_to_plots <- "~/research-collaboration/quitting_ind_differences/ind_diff_subtraction/plots"
+path_to_models <- "~/research-collaboration/quitting_ind_differences/ind_diff_subtraction/models"
+```
+
+## Histogram completed sessions
+This distribution shows the total amount of full sessions completed within the subtraction domain. 
+
+```{r Histogram sessions}
+sessions <- dat[item_count == 10, .N, by = user_id]$N
+min <- as.numeric(min(sessions))
+max <- as.numeric(max(sessions))
+breaks <- c(min, 10, 20, 30, 40, 50, 100, 200, max)
+bin_labels <- c("0-10", "10-20", "20-30", "30-40", "40-50", "50-100", "100-200", ">200")
+sessions_binned <- cut(sessions, breaks = breaks, labels = bin_labels, right = FALSE)
+sessions_binned <- as.data.frame(table(sessions_binned))
+
+hist_sessions <- ggplot(sessions_binned, aes(x = sessions_binned, y = Freq)) + 
+  geom_bar(stat = "identity", width = 1, fill = alpha(colors[1], 0.5), color = colors[1]) +
+  scale_x_discrete(labels = bin_labels) +
+  #geom_text(aes(label = paste0(round(Freq/sum(Freq)*100, 2), "%"), vjust = -0.5)) +
+  theme_minimal() + plot_theme+ 
+  #ggtitle("Histogram of Full Sessions Completed") + 
+  xlab("Number of Sessions") + 
+  ylab("Frequency") + 
+  plot_theme
+hist_sessions
+# export_plot(hist_sessions)
+```
+
+## Session plots 
+Here, I examine how the quitting rate changes over different session counts. Each person in our data is assigned a session count, indicating which session number they're currently on since the start of our data collection. By aggregating the quitting events across these session counts and then averaging them out, I'm able to see how the quitting behavior evolves over time, giving us insights into the trends of quitting behavior as people progress through sessions. I separate quitting probabilities across difficulty setting, and whether a user was new throughout the scope of our data or not (representing a more experienced user).
+
+I look at these trends across the first 50 sessions, as there is not many users who complete more than a total of 50 sessions. 
+```{r Set Max Session}
+max_session <- 50
+```
+
+
+```{r Quit session, message=FALSE}
+df_quit_session <- dat[, .(mean_quit = mean(quit), var_label = "New vs. Existing User"), 
+                       by = .(session_count, var = factor(new_user, levels = c(0, 1), labels = c("Existing User", "New User")), correct_answered)]
+df_quit_session_diff <- dat[new_user == 1, .(mean_quit = mean(quit), var_label = "Difficulty Level"), 
+                            by = .(session_count, var = factor(difficulty, levels = c(0:2), labels = c("Easy", "Medium", "Difficult")), correct_answered)]
+df_session_plots <- rbind(df_quit_session, df_quit_session_diff)
+
+levels(df_session_plots$var_label) <- c("New vs. Existing User", "Difficulty Level")
+df_session_plots[, correct_answered := factor(correct_answered, levels = c(0, 1), labels = c("Error", "Correct"))]
+
+session_plots <- ggplot(df_session_plots[session_count <= max_session], 
+                            aes(x = session_count, y = mean_quit, color = var, fill = var, linetype = correct_answered)) +
+  geom_smooth(se = T, alpha = 0.2) +
+  scale_discrete_manual(aesthetics = c("color", "fill"), values = colors[c(6,4,1,2,3)], name = "Group") +
+  scale_linetype_manual(values = c("solid", "dashed"), name = "Response") +
+  labs(x = "Session Count", y = "P(Quit)") +
+  guides(linetype = guide_legend(override.aes = list(color = colors[4], fill = NA))) +
+  plot_theme +
+  facet_wrap(~var_label) +
+  theme(panel.grid.major.x = element_blank())
+        # strip.background = element_rect(fill = colors[6], color = colors[4]),
+        # strip.text = element_text(color = colors[4], size = 10),
+        # panel.border = element_rect(color = colors[4], fill = NA, linewidth = 0.5))
+#export_plot(quit_session_diff)
+session_plots
+```
+
+# GLMER Model
+
+## Fit LMER Models
+I fit the random intercept and slope model with covariates, which was the best fitting model on the addition data, on the subtraction data. The grouping variable is user ID. Models are fit in a separate script, <fit_lmer_subtraction.R>. 
+
+*  Random intercept and slope model with covariates: quit ~ 1 + error_seq + rating + grade + (1 + error_seq | user_id)
+
+Note that, in contrast to the previous Markov models, the sequential error variable here is numeric. That is because the categorical sequential error variable leads to convergence issues in the lmer modeling.
+
+```{r Load Data glmer, message=FALSE, warning=FALSE}
+source("~/research-collaboration/quitting_ind_differences/dependencies.R")
+path_to_tables <- "~/research-collaboration/quitting_ind_differences/ind_diff_subtraction/tables"
+path_to_plots <- "~/research-collaboration/quitting_ind_differences/ind_diff_subtraction/plots"
+path_to_models <- "~/research-collaboration/quitting_ind_differences/ind_diff_subtraction/models"
+dat_sub <- readRDS(paste0(path_to_data, "/subtraction_forLMER.Rdata"))
+dat_sub <- as.data.table(dat_sub)
+model_sub <- readRDS(paste0(path_to_models, "/lmer_sub.RData"))
+```
+
+## Sample characteristics
+In this dataset, I include all users who also existed in either the testing or training addition dataset.  
+```{r GLMER N Subtraction}
+N <- dat_sub[grade>2, uniqueN(user_id)]
+cat("Total Sample Size:\n")
+N
+
+write.csv(N,
+       paste0(path_to_tables, "/glmer_sub_N.csv"))
+```
+
+In this subsection of the data, how many sessions, on average, were quit prematurely? 
+```{r Average Quit Rate glmer}
+dat_sub[, quit_session := ifelse(N < 10, 1, 0)]
+dat_sub[, user_session := paste(user_id, session_count, sep = "-")]
+quit_count <- dat_sub[, .(quit_session = unique(quit_session)), by = user_session]
+cat("Average quit rate, glmer data (subtraction):", mean(quit_count$quit_session))
+```
+
+## Fixed effects 
+
+Model coefficients for the fixed effects measures: 
+```{r GLMER Summary statistics}
+cat("\nSummary statistics for mixed model with a random intercept and slope with covariates:\n\n")
+cat("Subtraction \n")
+summary(model_sub)$coef
+
+write.csv(as.data.frame(summary(model_sub)$coef), paste0(path_to_tables, "/glmer_fixef_sub.csv"))
+
+## Correlations between fixed effects 
+stats_sub <- summary(model_sub)
+correlation_matrix <- as.matrix(stats_sub[["vcov"]]@factors[["correlation"]])
+correlation_df <- round(as.data.frame(correlation_matrix), 3)
+correlation_df
+
+write.csv(correlation_df, paste0(path_to_tables, "/glmer_fixefcor_sub.csv"))
+```
+
+## Random effects 
+Variance estimates for the glmer model on the subtraction data. 
+```{r GLMER variance statistics}
+cat("\nVariance estimates for mixed model with a random intercept and slope with covariates:\n\n")
+stats_sub$varcor
+
+write.csv(as.data.frame(stats_sub$varcor), paste0(path_to_tables, "/glmer_varest_sub.csv"))
+```
+
+### ICC
+Here, I calculate intra-class correlations (ICC), which provides insight into the proportion of total variability attributable to the grouping structure within the subtraction model. The ICC for the intercept indicates the proportion of variance in each individuals' baseline quitting rate (meaning quitting in the absence of error) that can be attributed to between-subject variability, while the ICC for the slope represents the proportion of variance in each individuals' effect of sequential errors on quitting, which can be attributed to between-subject variability. 
+
+```{r ICC Subtraction model}
+residvar_sub <- as.numeric(summary(model_sub)$AICtab[4])/as.numeric(summary(model_sub)$AICtab[5])
+ICC_sub_slope <- as.data.frame(stats_sub$varcor)$sdcor[2] / (as.data.frame(stats_sub$varcor)$sdcor[2] + residvar_sub)
+
+ICC_sub_int <- as.data.frame(stats_sub$varcor)$sdcor[1] / (as.data.frame(stats_sub$varcor)$sdcor[1] + residvar_sub)
+
+cat("ICC Esimates",
+    "\nIntercept:", ICC_sub_int,
+    "\nSlope:", ICC_sub_slope)
+```
+
+## Distribution of random effects 
+I extract the random effects and plot their distribution.  
+
+```{r Distribution random effects}
+fe_sub_int <- as.numeric(fixef(model_sub)[1])
+fe_sub_se <- as.numeric(fixef(model_sub)[2])
+
+user_ids <- as.numeric(rownames(as.data.frame(coef(model_sub)$user_id)))
+df_re <- data.frame(user_id = c(rep(user_ids, 2)),
+                    dat = c(rep("Subtraction", length(user_ids)*2)),
+                    effect = c(rep(c("Intercept", "Slope"), each = length(user_ids))),
+                    estimate = c(coef(model_sub)$user_id[, "(Intercept)"],
+                                 coef(model_sub)$user_id[, "error_seq"]))
+df_re <- data.table(df_re)
+saveRDS(df_re, paste0(path_to_tables, "/ranef_sub.Rdata"))
+
+# Density plot, adjusted for fixed effect estimates
+plot_density <- ggplot(df_re[dat == "Subtraction"], aes(x = estimate, group = effect, color = effect, fill = effect)) +
+  geom_density(alpha = 0.1) +
+  scale_discrete_manual(aesthetics = c("color", "fill"), values = colors[2:3], 
+                        name = "", labels = c("Baseline Quit Rates", "Effect of Sequential Errors on Quitting")) +
+  labs(title = "Distribution of Random Slopes and Intercepts per User",
+       x = "Estimate", y = "Density") +
+  theme_minimal() + plot_theme +
+  facet_wrap(~effect) +
+  theme(panel.grid.major.x = element_blank(),
+        legend.position = "bottom")
+ 
+plot_density
+```

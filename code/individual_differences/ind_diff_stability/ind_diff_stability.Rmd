@@ -1,0 +1,434 @@
+---
+title: "Stability of Individual Differences"
+author: "Annie Johansson"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    keep_tex: yes
+---
+
+This document is intended to analyze the cross-domain stability of the individual differences in error-induced quitting. I load in the glmer model results from both the addition and subtraction data, plot them side by side and correlate them. To have as large of a population pool as possible available for analysis, I collapse the testing and training datasets from the addition analysis into one. (This is also done when extracting which users to include in the glmer modeling of the subtraction data). 
+
+```{r Set-up, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  # fig.width = 8,
+  # fig.height = 4,
+  fig.align = "left",
+  out.width = "100%", 
+  tidy = TRUE
+)
+```
+
+```{r Load data and models, message=FALSE, warning=FALSE}
+source("~/research-collaboration/quitting_ind_differences/dependencies.R")
+path_to_tables <- "~/research-collaboration/quitting_ind_differences/ind_diff_stability/tables"
+path_to_tables_add_train <- "~/research-collaboration/quitting_ind_differences/ind_diff_addition/tables/train"
+path_to_tables_add_test <- "~/research-collaboration/quitting_ind_differences/ind_diff_addition/tables/test"
+path_to_tables_sub <- "~/research-collaboration/quitting_ind_differences/ind_diff_subtraction/tables"
+path_to_plots <- "~/research-collaboration/quitting_ind_differences/ind_diff_stability/plots"
+
+# Collapsing training and testing datasets for this analysis
+dat_add_train <- readRDS(paste0("~/research-collaboration/quitting_ind_differences/data_clean/addition_train_forLMER.Rdata"))
+dat_add_test <- readRDS(paste0("~/research-collaboration/quitting_ind_differences/data_clean/addition_test_forLMER.Rdata"))
+dat_add <- rbind(dat_add_train, dat_add_test)
+dat_add <- as.data.table(dat_add)
+rm(dat_add_train, dat_add_test)
+
+dat_sub <- readRDS(paste0(path_to_data, "/subtraction_forLMER.Rdata"))
+dat_sub <- as.data.table(dat_sub)
+
+model_add <- readRDS("~/research-collaboration/quitting_ind_differences/ind_diff_addition/models/train/ran_int_slope_cov.RData")
+model_sub <- readRDS("~/research-collaboration/quitting_ind_differences/ind_diff_subtraction/models/lmer_sub.RData")
+```
+
+# Fixed effects estimates
+```{r GLMER Fixed Effects Addition & Subtraction, eval = FALSE}
+cat("\nSummary statistics for mixed model with a random intercept and slope with covariates:\n\n")
+cat("Addition \n")
+summary(model_add)$coef
+cat("\nSubtraction \n")
+summary(model_sub)$coef
+```
+
+```{r Plot GLMER Fixed Effects Addition & Subtraction }
+# df_fe_add <- as.data.frame(FEsim(model_add))
+# df_fe_add <- df_fe_add[-1,]
+# df_fe_add$dat <- "Addition"
+# 
+# df_fe_sub <- as.data.frame(FEsim(model_sub))
+# df_fe_sub <- df_fe_sub[-1,]
+# df_fe_sub$dat <- "Subtraction"
+# 
+# df_fe <- rbind(df_fe_add, df_fe_sub)
+# 
+# saveRDS(df_fe, paste0(path_to_tables, "/df_fe_sim.Rdata"))
+df_fe <- readRDS(paste0(path_to_tables, "/df_fe_sim.Rdata"))
+
+df_fe$term <- factor(df_fe$term, levels = c("error_seq", "rat_center", "grade"), labels = c("Sequential Errors", "Ability Rating", "Grade"))
+
+# Plot fixed effects 
+fixed_ef <- ggplot(data = df_fe) +
+  aes(x = term, ymin = mean - 1.96 * sd,
+      ymax = mean + 1.96 * sd, y = mean) +
+  geom_point(color = colors[1], size = pointsize) +
+  geom_linerange(color = colors[1], linewidth = linesize, alpha = alpha) +
+  geom_hline(yintercept = 0, color = colors[5], linetype = "dashed") +
+  coord_flip() +
+  plot_theme + 
+  labs(title = "Fixed Effect Coefficients",
+                    x = "Covariate", y = "Fixed Effect Estimate") +
+  facet_wrap(~dat) +
+  theme(legend.position = "none")
+        # strip.background = element_rect(fill = colors[6], color = colors[4]),
+        # strip.text = element_text(color = colors[4], size = 10),
+        # panel.border = element_rect(color = colors[4], fill = NA, linewidth = 0.5)) +
+  
+fixed_ef
+```
+
+# Random effects estimates
+```{r GLMER variance statistics add&sub, eval = FALSE}
+cat("\nVariance estimates for mixed model with a random intercept and slope with covariates:\n\n")
+stats_add <- summary(model_add)
+stats_add$varcor
+
+cat("\nVariance estimates for mixed model with a random intercept and slope with covariates:\n\n")
+stats_sub <- summary(model_sub)
+stats_sub$varcor
+```
+
+```{r GLMER Random Effects Addition & Subtraction, warning=FALSE, message=FALSE}
+# # Make dataframe of random effects
+# ranef_add <- ranef(model_add)$user_id
+# ranef_add$user_id <- as.numeric(rownames(ranef_add))
+# ranef_sub <- ranef(model_sub)$user_id
+# ranef_sub$user_id <- as.numeric(rownames(ranef_sub))
+# 
+# ranef_add <- data.table(ranef_add)
+# ranef_sub <- data.table(ranef_sub)
+# 
+# saveRDS(ranef_add, paste0(path_to_tables, "/ranef_add.Rdata"))
+# saveRDS(ranef_sub, paste0(path_to_tables, "/ranef_sub.Rdata"))
+
+ranef_add_train <- readRDS(paste0(path_to_tables_add_train, "/ranef_add.Rdata"))
+ranef_add_test <- readRDS(paste0(path_to_tables_add_test, "/ranef_add.Rdata"))
+ranef_add <- rbind(ranef_add_train, ranef_add_test)
+ranef_sub <- readRDS(paste0(path_to_tables_sub, "/ranef_sub.Rdata"))
+ranef <- rbind(ranef_add, ranef_sub)
+```
+
+## Distribution of random effects 
+
+```{r GLMER Random Effects Addition & Subtraction2, warning=FALSE, message=FALSE}
+# # Density plot, centered around zero
+# df_ran_effects_cov <- data.frame(dat = c(rep("Addtion", nrow(ranef_add)*2), rep("Subtraction", nrow(ranef_sub)*2)),
+#                              user_id = rep(c(ranef_add$user_id, ranef_sub$user_id), each = 2), 
+#                                  effect = c(rep(c("intercept", "slope"), each = c(nrow(ranef_add))),
+#                                             rep(c("intercept", "slope"), each = c(nrow(ranef_sub)))),
+#                                  estimate = c(ranef_add$`(Intercept)`, ranef_add$error_seq,
+#                                                   ranef_sub$`(Intercept)`, ranef_sub$error_seq),
+#                              estimate_adj = c(coef(model_add)$user_id[, "error_seq"],
+#                                               coef(model_sub)$user_id[, "error_seq"]))
+# 
+# plot_density_center <- ggplot(df_ran_effects_cov, aes(x = estimate, group = effect, color = effect, fill = effect)) +
+#   geom_density(alpha = 0.1) +
+#   geom_vline(xintercept = 0, linetype = "dashed", color = colors[6]) +
+#   scale_discrete_manual(aesthetics = c("color", "fill"), values = colors[2:3], 
+#                         name = "", labels = c("Baseline Quit Rates", "Effect of Sequential Errors on Quitting")) +
+#   labs(title = "Distribution of Random Slopes and Intercepts per User",
+#        x = "Estimate", y = "Density") +
+#   theme_minimal() + plot_theme +
+#   theme(panel.grid.major.x = element_blank(),
+#         legend.position = "bottom",
+#         strip.background = element_rect(fill = colors[6], color = colors[4]),
+#         strip.text = element_text(color = colors[4], size = 10),
+#         panel.border = element_rect(color = colors[4], fill = NA, linewidth = 0.5)) +
+#   facet_wrap(~dat)
+# plot_density_center
+
+# # Fixed effect estimates 
+fe_add_int <- as.numeric(fixef(model_add)[1])
+fe_add_se <- as.numeric(fixef(model_add)[2])
+fe_sub_int <- as.numeric(fixef(model_sub)[1])
+fe_sub_se <- as.numeric(fixef(model_sub)[2])
+
+# Density plot, adjusted for fixed effect estimates
+plot_density <- ggplot(ranef, aes(x = estimate, group = effect, color = effect, fill = effect)) +
+  geom_density(alpha = 0.1) +
+  geom_vline(data = subset(ranef, dat == "Addition"), aes(xintercept = fe_add_int), 
+             color = colors[2], linetype = "dashed", alpha = 0.7, inherit.aes = FALSE) +
+  geom_vline(data = subset(ranef, dat == "Addition"), aes(xintercept = fe_add_se), 
+             color = colors[3], linetype = "dashed", alpha = 0.7, inherit.aes = FALSE) +
+  geom_vline(data = subset(ranef, dat == "Subtraction"), aes(xintercept = fe_sub_int), 
+             color = colors[2], linetype = "dashed", alpha = 0.7, inherit.aes = FALSE) +
+  geom_vline(data = subset(ranef, dat == "Subtraction"), aes(xintercept = fe_sub_se), 
+             color = colors[3], linetype = "dashed", alpha = 0.7, inherit.aes = FALSE) +
+  scale_discrete_manual(aesthetics = c("color", "fill"), values = colors[2:3], 
+                        name = "", labels = c("Baseline Quit Rates", "Effect of Sequential Errors on Quitting")) +
+  labs(title = "Distribution of Random Slopes and Intercepts per User",
+       x = "Estimate", y = "Density") +
+  facet_wrap(~dat) +
+  theme_minimal() + plot_theme +
+  theme(panel.grid.major.x = element_blank(),
+        legend.position = "bottom")
+        # strip.background = element_rect(fill = colors[6], color = colors[4]),
+        # strip.text = element_text(color = colors[4], size = 10),
+        # panel.border = element_rect(color = colors[4], fill = NA, linewidth = 0.5)) +
+ 
+plot_density
+```
+
+## Correlation between random effects
+
+```{r Correlation random effects, message=FALSE}
+ranef_add <- ranef_add[order(user_id)]
+ranef_sub <- ranef_sub[order(user_id)]
+n <- length(ranef_add[user_id %in% ranef_sub[, unique(user_id)]][, unique(user_id)])
+df_cor <- data.frame(user_id = ranef_add[user_id %in% ranef_sub[, unique(user_id)]][, unique(user_id)],
+                     add_int = ranef_add[user_id %in% ranef_sub[, unique(user_id)]][effect == "Intercept", estimate],
+                     add_slope = ranef_add[user_id %in% ranef_sub[, unique(user_id)]][effect == "Slope", estimate],
+                     sub_int = ranef_sub[effect == "Intercept", estimate],
+                     sub_slope = ranef_sub[effect == "Slope", estimate]
+                     )
+
+cor <- cor.test(df_cor$add_slope, df_cor$sub_slope)
+cor_int <- cor.test(df_cor$add_int, df_cor$sub_int)
+
+cat("Correlation Random Intercepts\n")
+cor_int
+cat("\nCorrelation Random Slopes\n")
+cor
+```
+
+```{r Plot correlation, fig.width=4, fig.height=5}
+# Create a data frame for plotting
+r_int <- paste("r = ", round(as.numeric(cor_int$estimate), 2))
+r_slope <- paste("r = ", round(as.numeric(cor$estimate), 2))
+
+df_cor_plot <- data.frame(est = rep(c("Intercept", "Slope"), each = length(df_cor$add_int)),
+                     add = c(df_cor$add_int, df_cor$add_slope),
+                     sub = c(df_cor$sub_int, df_cor$sub_slope))
+df_cor_plot <- as.data.table(df_cor_plot)
+
+# geom <- paste("r = ", r_slope)
+plot_cor_facet <- ggplot(df_cor_plot, aes(x = add, y = sub)) +
+  geom_point(color = colors[6], alpha = alpha) +
+  geom_smooth(method = "lm", se = TRUE, aes(color = est, fill = est), alpha = alpha) + 
+  #annotate("text", x = -.7, y = 2.8, label = r_slope, hjust = 0) +
+  scale_discrete_manual(aesthetics = c("color", "fill"), values = colors[2:3]) +
+  labs(title = "Correlation Between Random Effects",
+       # subtitle = paste("Pearson's *r* =", round(cor$estimate, 2),
+       #               "; \n *p* < .001"),
+       x = "Random Effects Addition Data",
+       y = "Random Effects Subtraction Data") +
+  facet_wrap(~est, strip.position = "right", nrow = 2, scales = "free") +
+  plot_theme +
+  theme(legend.position = "none",
+        panel.grid = element_blank())
+
+plot_cor_facet
+```
+
+I use the REsim function from the package merTools to simulate the random effects from the glmer model. I do this so that I can obtain confidence intervals for plotting.
+```{r Simulate Random Effects, eval=FALSE}
+# Simulate confidence intervals for random effects
+set.seed(1234)
+ranef_add_sim <- REsim(model_add)
+ranef_sub_sim <- REsim(model_sub)
+ranef_add_sim$groupID <- as.numeric(ranef_add_sim$groupID)
+ranef_sub_sim$groupID <- as.numeric(ranef_sub_sim$groupID)
+ranef_add_sim <- data.table(ranef_add_sim)
+ranef_sub_sim <- data.table(ranef_sub_sim)
+
+# Save simulated random effects
+saveRDS(ranef_add_sim, paste0(path_to_models, "/ranef_add_sim.Rdata"))
+saveRDS(ranef_sub_sim, paste0(path_to_models, "/ranef_sub_sim.Rdata"))
+
+# Load simulated random effects
+ranef_add_sim <- readRDS(paste0(path_to_models, "/ranef_add_sim.Rdata"))
+ranef_sub_sim <- readRDS(paste0(path_to_models, "/ranef_sub_sim.Rdata"))
+
+# # Sample 300 users to plot
+set.seed(1234)
+user_ids <- sample(ranef_sub[, unique(user_id)], 300)
+ranef_add_sim <- ranef_add_sim[ranef_add_sim$groupID %in% user_ids,]
+ranef_sub_sim <- ranef_sub_sim[ranef_sub_sim$groupID %in% user_ids,]
+
+# # Create dataframe of simulated random effects
+p_ranef_add_sim <- plotREsim(ranef_add_sim)
+p_ranef_sub_sim <- plotREsim(ranef_sub_sim)
+df_ranef_add_sim <- p_ranef_add_sim$data
+df_ranef_sub_sim <- p_ranef_sub_sim$data
+df_ranef_add_sim$dat <- "Addition"
+df_ranef_sub_sim$dat <- "Subtraction"
+ranef_sim <- rbind(df_ranef_add_sim, df_ranef_sub_sim)
+ranef_sim$term_label <- ifelse(ranef_sim$term == "(Intercept)", "Intercept", "Sequential Errors")
+ranef_sim$user_id <- ranef_sim$groupID
+user_ids <- unique(ranef_sim$groupID)
+ranef_sim <- as.data.table(ranef_sim)
+
+# # Adjust estimated effects for fixed effects
+ranef_sim[term_label == "Intercept" & dat == "Addition", mean := mean + fe_add_int]
+ranef_sim[term_label == "Sequential Errors" & dat == "Addition", mean := mean + fe_add_se]
+ranef_sim[term_label == "Intercept" & dat == "Subtraction", mean := mean + fe_sub_int]
+ranef_sim[term_label == "Sequential Errors" & dat == "Subtraction", mean := mean + fe_sub_se]
+
+ranef_sim[term_label == "Intercept" & dat == "Addition", ymin := ymin + fe_add_int]
+ranef_sim[term_label == "Sequential Errors" & dat == "Addition", ymin := ymin + fe_add_se]
+ranef_sim[term_label == "Intercept" & dat == "Subtraction", ymin := ymin + fe_sub_int]
+ranef_sim[term_label == "Sequential Errors" & dat == "Subtraction", ymin := ymin + fe_sub_se]
+
+ranef_sim[term_label == "Intercept" & dat == "Addition", ymax := ymax + fe_add_int]
+ranef_sim[term_label == "Sequential Errors" & dat == "Addition", ymax := ymax + fe_add_se]
+ranef_sim[term_label == "Intercept" & dat == "Subtraction", ymax := ymax + fe_sub_int]
+ranef_sim[term_label == "Sequential Errors" & dat == "Subtraction", ymax := ymax + fe_sub_se]
+
+# # Combine estimated confidence intervals with coefficients from the glmer model (ranef)
+ranef_subset <- ranef[user_id %in% user_ids]
+ran_effects <- data.frame()
+for(id in user_ids) {
+  tmp <- data.frame(user_id = id,
+                    dat = rep(c("Addition", "Subtraction"), each = 2),
+                    effect = rep(c("Intercept", "Slope"), 2),
+                    estimate = ranef_subset[user_id == id, estimate],
+                    ymin = ranef_sim[user_id == id, ymin],
+                    ymax = ranef_sim[user_id == id, ymax],
+                    sig = ranef_sim[user_id == id, sig]
+                    )
+  ran_effects <- rbind(ran_effects, tmp)
+}
+
+saveRDS(ran_effects, paste0(path_to_tables, "/df_re_sim.Rdata"))
+```
+
+
+```{r Plot Random Effects}
+ran_effects <- readRDS(paste0(path_to_tables, "/df_re_sim.Rdata"))
+
+# # Plot random effects with CIs for the sampled users 
+dataframes <- split(ran_effects, list(ran_effects$dat, ran_effects$effect))
+plots <- list()
+for(df in dataframes) {
+  color <- ifelse(unique(df$effect) == "Slope", colors[3], colors[2])
+  hline <- ifelse(unique(df$effect) == "Slope" & unique(df$dat) == "Addition",
+                  fe_add_se, ifelse(unique(df$effect) == "Slope" & unique(df$dat) == "Subtraction", fe_sub_se, ifelse(unique(df$effect) == "Intercept" & unique(df$dat) == "Addition", fe_add_int, fe_sub_int)))
+  ylim <- ifelse(unique(df$effect) == "Intercept", c(-7, 2), c(-1, 3))
+  
+  gg <- ggplot(df, aes(x = reorder(factor(user_id), estimate), y = estimate, group = dat)) +
+    geom_ribbon(aes(ymin = ymin, ymax = ymax), 
+                fill = color, color = NA, alpha = 0.2) +
+    geom_line(color = color, linewidth = linesize, aes(alpha = sig)) +
+    #geom_point(color = color, aes(alpha = sig, group = dat)) +
+    # geom_linerange(aes(ymin = ymin, ymax = ymax), 
+    #                color = color, linewidth = linesize, alpha = 0.05) +
+    scale_alpha_manual(values = c(0.2, 0.9)) +
+    geom_hline(yintercept = hline, color = color, linetype = "dashed") +
+    labs(x = NULL, y = NULL) +
+    plot_theme +
+    theme(panel.grid.major.x = element_blank(),
+          legend.position = "none",
+          axis.text.x = element_blank())
+          # strip.background = element_rect(fill = colors[6], color = colors[4]),
+          # strip.text = element_text(color = colors[4], size = 10),
+          # panel.border = element_rect(color = colors[4], fill = NA, linewidth = 0.5))
+  
+  ifelse(unique(df$effect) == "Intercept", 
+         gg <- gg + ylim(-6, 2) + facet_wrap(~dat), 
+         gg <- gg
+         )
+  
+  ifelse(unique(df$effect) == "Intercept" & unique(df$dat) == "Subtraction", 
+         gg <- gg + facet_grid(effect~dat),
+         gg <- gg
+         )
+  
+  ifelse(unique(df$effect) == "Slope" & unique(df$dat) == "Subtraction",
+         gg <- gg + facet_wrap(~effect, strip.position = "right"),
+         gg <- gg
+         )
+  
+  ifelse(unique(df$effect) == "Slope",
+         gg <- gg + ylim(-1, 3),
+         gg <- gg
+         )
+  
+  ifelse(unique(df$dat) == "Addition",
+         gg <- gg + ylab("Effect Estimate"),
+         gg <- gg
+         )
+  
+  plots[[length(plots) + 1]] <- gg
+}
+
+grid.arrange(grobs = plots, ncol = 2, widths = c(1, 1.05))
+```
+
+
+```{r Plot Random Effects and Cor, fig.width=10, fig.height=6}
+grid.arrange(
+  arrangeGrob(
+    grobs = plots,
+    ncol = 2,
+    widths = c(1, 1.05)
+  ),
+  plot_cor_facet,
+  widths = c(3, 2)
+)
+```
+
+### Correlation random effects with age & ability 
+
+```{r Correlation Ability and Age - Addition}
+df_add_ratgrade <- dat_add[, .(rat = unique(rat, na.rm = TRUE),
+                               grade = max(grade)), by = user_id]
+
+cat("Intercept\n\n\n")
+df_add_ratgrade <- df_add_ratgrade[user_id %in% ranef_add[, unique(user_id)]]
+cat("Correlation Random Intercepts Addition Game with Ability Rating:\n")
+cor.test(ranef_add[order(user_id), ][effect == "Intercept", estimate], df_add_ratgrade[order(user_id), .(rat)]$rat)
+cat("\n\nCorrelation Random Intercepts Addition Game with Grade:\n")
+cor.test(ranef_add[order(user_id), ][effect == "Intercept", estimate], df_add_ratgrade[order(user_id), .(grade)]$grade)
+
+cat("\n\nSlope\n\n\n")
+df_add_ratgrade <- df_add_ratgrade[user_id %in% ranef_add[, unique(user_id)]]
+cat("Correlation Random Effects Addition Game with Ability Rating:\n")
+cor.test(ranef_add[order(user_id), ][effect == "Slope", estimate], df_add_ratgrade[order(user_id), .(rat)]$rat)
+cat("\n\nCorrelation Random Effects Addition Game with Grade:\n")
+cor.test(ranef_add[order(user_id), ][effect == "Slope", estimate], df_add_ratgrade[order(user_id), .(grade)]$grade)
+```
+
+```{r Correlation Ability and Age - Subtraction}
+df_sub_ratgrade <- dat_sub[, .(rat = unique(user_rating, na.rm = TRUE),
+                               grade = max(grade)), by = user_id]
+
+cat("Intercept\n\n\n")
+df_sub_ratgrade <- df_sub_ratgrade[user_id %in% ranef_sub[, unique(user_id)]]
+cat("Correlation Random Intercepts Subtraction Game with Ability Rating:\n")
+cor.test(ranef_sub[order(user_id), ][effect == "Intercept", estimate], df_sub_ratgrade[order(user_id), .(rat)]$rat)
+cat("\n\nCorrelation Random Intercepts Subtraction Game with Grade:\n")
+cor.test(ranef_sub[order(user_id), ][effect == "Intercept", estimate], df_sub_ratgrade[order(user_id), .(grade)]$grade)
+
+cat("\n\nSlope\n\n\n")
+df_sub_ratgrade <- df_sub_ratgrade[user_id %in% ranef_sub[, unique(user_id)]]
+cat("Correlation Random Effects Subtraction Game with Ability Rating:\n")
+cor.test(ranef_sub[order(user_id), ][effect == "Slope", estimate], df_sub_ratgrade[order(user_id), .(rat)]$rat)
+cat("\n\nCorrelation Random Effects Subtraction Game with Grade:\n")
+cor.test(ranef_sub[order(user_id), ][effect == "Slope", estimate], df_sub_ratgrade[order(user_id), .(grade)]$grade)
+```
+
+### Cross-effect correlations
+To make sure that our found correlation values are meaningful and not due to a phenomenon in the data such as the positive manifold where everything is correlated with everything, I correlate the random intercepts of one domain with the random effects of the other domain. These estimates should be lower. 
+
+```{r Cross domain correlations}
+cor_crossdomain <- cor.test(df_cor$add_int, df_cor$sub_slope)
+cor_crossdomain
+
+cor_crossdomain2 <- cor.test(df_cor$add_slope, df_cor$sub_int)
+cor_crossdomain2
+```
+
+
+

@@ -1,0 +1,432 @@
+---
+title: "Subtraction Data Preparation"
+author: "Annie Johansson"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    keep_tex: yes
+---
+
+This script loads the subtraction data for the 2023 quitting project, cleans it and constructs the necessary variables for analysis. 
+The dataset gets split into a training and testing dataset (50/50 split, specified in the script "load_subtraction_data_new.R". The desired dataset can be specified in chunk 2 ("Load data"). 
+
+```{r Directory, message = FALSE}
+setwd("/home/user-048/research-collaboration/quitting_ind_differences/data_prep")
+path <- getwd()
+
+library(tidyverse) 
+library(data.table)
+library(lubridate)
+library(slider)
+```
+
+# Loading data
+```{r Load data}
+source("load_subtraction_data.R")
+all_logs %<>%
+      mutate(created = parse_date_time(created, orders = "%Y:%m:%d %H:%M:%S"),
+             date = as.Date(created),
+             time = format(created, "%H:%M:%S")) %>% 
+      data.table(.) %>%
+      setkeyv(., cols = c("user_id", "created"))
+
+user_ids_subtraction <- all_logs[, unique(user_id)]
+saveRDS(user_ids_subtraction, file = "~/research-collaboration/quitting_ind_differences/data/subtraction/user_ids_subtraction.Rdata")
+```
+
+# Variable computations 
+## Session count 
+Because some sessions are learning goal sessions and some are not, I am checking so that the session counter is computed correctly here. It needs to be sequential across time, regardless of the type of session. For example, one session can not be linked with several dates (this is a problem which was discovered and is being fixed here).
+
+```{r Check session counter}
+dat1 <- all_logs[, max(created), by = .(user_id, user_session_count)]
+dat2 <- all_logs[, min(created), by = .(user_id, user_session_count)]
+dat1$t2 <- dat2$V1
+dat1$time_diff <- difftime(dat1$V1, dat1$t2, unit = "days")
+table(dat1$time_diff > 1)
+# Here is the problem: there are 223741 cases where one session lasts more than 1 day. 
+length(unique(dat1[dat1$time_diff > 1]$user_id))
+# This affects 78784 unique users in the training dataset 
+
+# Creating a vector of all the affected sessions
+sessions <- dat1[time_diff > 1, .(user_id, user_session_count)]
+
+# Temporary dataframe with all affected sessions 
+df_tmp <- all_logs[sessions, on = c("user_id", "user_session_count")]
+dates_per_session <- all_logs[, length(unique(date)), by = .(user_id, user_session_count)] # How many unique dates per session
+table(dates_per_session$V1)
+N_per_session <- all_logs[, .N, by = .(user_id, user_session_count)] #How many rows per session (should be max 10)
+table(N_per_session$N)
+```
+
+```{r Session counter}
+# long vector of session number pasted with the learning ID, so that each session has a unique value per user. 
+temp <- paste(all_logs$user_session_count, all_logs$session, sep = "-")
+# length(unique(temp))
+# length(unique(all_logs$user_session_count)) 
+
+all_logs$session_lg <- temp # add session learning goal variable to log data
+
+# Create new session counter based on this variable 
+all_logs[, session_count := rleid(session_lg), by = user_id] 
+
+# This variable will always start the session counter at 1, regardless of whether the user was playing before the cut-off date of our data selection (2020-09-01). Therefore, I also create a variable which denotes whether the first (ever) session of the user is contained in this data (new_user = 1) or not (new_user = 0). 
+new_user <- all_logs[session == "domain" & rowid(user_id) == 1, .(new_user = +(user_session_count == 1)), by = user_id]
+all_logs <- merge(all_logs, new_user, by = "user_id")
+rm(new_user)
+```
+
+```{r Check new session counter}
+dat1_new <- all_logs[, max(created), by = .(user_id, session_count)]
+dat2_new <- all_logs[, min(created), by = .(user_id, session_count)]
+dat1_new$t2 <- dat2_new$V1
+dat1_new$time_diff <- difftime(dat1_new$V1, dat1_new$t2, unit = "days")
+table(dat1_new$time_diff > 1)
+# Only a few (n = 28) problematic cases 
+length(unique(dat1_new[dat1_new$time_diff > 1]$user_id))
+# This affects 26 unique users in the training dataset 
+
+# Creating a vector of all the affected sessions
+sessions <- dat1_new[time_diff > 1, .(user_id, session_count)]
+
+# Temporary dataframe with all affected sessions 
+df_tmp_new <- all_logs[sessions, on = c("user_id", "session_count")]
+
+
+dates_per_session_new <- all_logs[, length(unique(date)), by = .(user_id, session_count)] # How many unique dates per session
+unique(dates_per_session_new$V1)
+# There are still a few cases where one session overlaps by one day. This is most likely users playing over midnight or in a different timezone 
+
+# Remove these users (n = 26)
+all_logs <- all_logs[!user_id %in% unique(sessions$user_id)]
+
+
+# Here looking at how many rows per session (should be max 10)
+N_per_session_new <- all_logs[, .N, by = .(user_id, session_count)] 
+table(N_per_session_new$N)
+# There are still cases where the session length is longer than 10. 
+sessions_N <- N_per_session_new[N > 10, .(user_id, session_count)]
+df_tmp_N <- all_logs[sessions_N, on = c("user_id", "session_count")]
+
+# Remove these users (n = 55)
+all_logs <- all_logs[!user_id %in% unique(sessions_N$user_id)]
+
+# Checking again ----
+dat1_new <- all_logs[, max(created), by = .(user_id, session_count)]
+dat2_new <- all_logs[, min(created), by = .(user_id, session_count)]
+dat1_new$t2 <- dat2_new$V1
+dat1_new$time_diff <- difftime(dat1_new$V1, dat1_new$t2, unit = "days")
+table(dat1_new$time_diff > 1)
+length(unique(dat1_new[dat1_new$time_diff > 1]$user_id))
+
+rm(dat1, dat1_new, dat2, dat2_new, dates_per_session, dates_per_session_new, df_tmp, df_tmp_N, df_tmp_new, N_per_session, N_per_session_new, sessions, sessions_N)
+```
+
+```{r Session count}
+hist(all_logs[session_count < 100, session_count], 
+     breaks = 100, 
+     main = "Histogram of Session Count, Addition", 
+     col = adjustcolor("turquoise4", alpha.f = 0.5), 
+     border = "turquoise4", 
+     xlab = "Session Count",
+     density = 30)
+```
+
+## Item count
+A counter that denotes, within a session, what item number the user is on. Can only take values from 1 to 10. 
+(Item counter takes a couple minutes to run.)
+```{r Item counter}
+all_logs[, item_count := order(created), by  = c("user_id", "session_count")] 
+table(all_logs$item_count)
+hist(all_logs[session_count < 100, session_count], 
+     breaks = 100, 
+     main = "Histogram of Session Count, Addition", 
+     col = adjustcolor("turquoise4", alpha.f = 0.5), 
+     border = "turquoise4", 
+     xlab = "Session Count",
+     density = 30)
+```
+
+```{r Clean-up}
+rm(temp)
+gc()
+```
+
+## Reponse accuracy 
+Out of time and question mark responses are marked in the answer variable as "…" and "¿", respectively. To make a numeric column for correct_answered, I create a new variable (correct_answered_NA) which denotes every correct as 1, incorrect response as 0, and anything else as NA. In our main analysis, we include these responses are incorrect (i.e., 0). This variable is computed here as "correct_answered". Having both of these variables in the data allows us to check whether they affect quitting differently. 
+
+```{r Correct_answered}
+all_logs[, out_of_time := ifelse(answer == "…", 1, 0)]
+all_logs[, question_mark := ifelse(answer == "¿", 1, 0)]
+all_logs[, correct_answered_NA := ifelse(out_of_time == 1, NA, ifelse(question_mark == 1, NA, correct_answered))]
+
+all_logs <- all_logs %>% 
+  # On very rare occasions, a player responds so quickly to a problem
+  # that its time stamp registration is on exactly the same time.
+  distinct(user_id, created, .keep_all = TRUE)  # keep only distinct rows
+
+mean_accuracy <- all_logs[, mean(correct_answered, na.rm = T), by = "user_id"]
+hist(mean_accuracy$V1, 
+     breaks = 100, 
+     main = "Histogram of Average Accuracy Across Users, Addition", 
+     col = adjustcolor("turquoise4", alpha.f = 0.5), 
+     border = "turquoise4", 
+     density = 30,
+     xlab = "Mean(Correct Answered)")
+```
+
+## Sequential errors 
+I make 2 sequential error variables, one where out-of-time and question-mark responses are excluded as incorrect responses (marked NA instead), and one where they are included as incorrect responses. 
+(Both these variables take a while to run)
+
+```{r error_seq_excl, warning=FALSE}
+# This computation excludes responses that are out of time or question mark. 
+all_logs[out_of_time == 0 & question_mark == 0,
+         error_seq_excl := sapply(.SD,
+                             function(x) {
+                               
+                               store <- numeric()
+                               count <- 0
+                               
+                               for (i in 1:length(x))
+                                 if (x[i] == 1) {
+                                   count <- 0
+                                   store[i] <- count
+                                 } else {
+                                   count <- count + 1
+                                   store[i] <- count
+                                 }
+                               return(store)
+                             }),
+         by = .(user_id, session_count),
+         .SDcols = "correct_answered_NA"]
+hist(all_logs[error_seq_excl > 0, error_seq_excl], 
+     breaks = seq(min(all_logs$item_count) - 0.5, max(all_logs$item_count) + 0.5, by = 1),
+     density = 30, 
+     main = "Histogram of Sequential Errors, Addition", 
+     col = adjustcolor("turquoise4", alpha.f = 0.5), 
+     border = "turquoise4",
+     xlab = "Number of Sequential Errors")
+```
+
+```{r error_seq}
+# !! Here outoftime and QM responses are included as incorrect responses. 
+all_logs[,
+         error_seq := sapply(.SD,
+                             function(x) {
+                               
+                               store <- numeric()
+                               count <- 0
+                               
+                               for (i in 1:length(x))
+                                 if (x[i] == 1) {
+                                   count <- 0
+                                   store[i] <- count
+                                 } else {
+                                   count <- count + 1
+                                   store[i] <- count
+                                 }
+                               return(store)
+                             }),
+         by = .(user_id, session_count),
+         .SDcols = "correct_answered"]
+hist(all_logs[error_seq > 0, error_seq], 
+     breaks = seq(min(all_logs$item_count) - 0.5, max(all_logs$item_count) + 0.5, by = 1),
+     density = 30, 
+     main = "Histogram of Sequential Errors, Addition", 
+     col = adjustcolor("turquoise4", alpha.f = 0.5), 
+     border = "turquoise4",
+     xlab = "Number of Sequential Errors")
+```
+
+I make a categorical sequential error variable based on error_seq, with 4 levels: 0 = 0; 1 = 1; 2 = 2; 3 = 3; >3 = 4
+```{r categorical sequential error}
+# Make categorical sequential error variable
+# 0 = 0; 1 = 1; 2 = 2; 3 = 3; >3 = 4
+all_logs[, error_seq_cat := ifelse(error_seq == 0, 0,
+                               ifelse(error_seq == 1, 1, 
+                                      ifelse(error_seq == 2, 2, 
+                                             ifelse(error_seq == 3, 3,
+                                                    4)))), ]
+all_logs$error_seq_cat <- factor(all_logs$error_seq_cat,
+                             levels = c(0:4),
+                             labels = c("0", "1", "2", "3", ">3"))
+
+
+```
+
+## Ability
+
+```{r Ability variables}
+load("~/research-collaboration/quitting_ind_differences/data_clean/player_ratings_subtraction.Rdata")
+all_logs <-  merge(all_logs, player_ratings, by = "user_id")
+rm(player_ratings)
+```
+
+
+## Inactivity and triple error
+These variables are created to detect non=-derliberate gameplay behavior, such as having several out of time or error responses in a row. 
+
+```{r Inactivity and triple error, warning=FALSE}
+# Out of time counter
+# Adapt the seq error function to make a sequential out_of_time variable for the inactivity quit type
+
+ootime_counter <- function(x) {
+  store <- numeric()
+  count <- 0
+  for (i in 1:length(x))
+    if (x[i] == 0) {
+      count <- 0
+      store[i] <- count
+    } else {
+      count <- count + 1
+      store[i] <- count
+    }
+  return(store)
+}
+
+
+# Replace NA values in 'out_of_time' with 0
+all_logs[, out_of_time := ifelse(is.na(out_of_time), 0, out_of_time)]
+
+# Calculate 'ootime_seq' by user_id and session_count
+all_logs[, ootime_seq := ootime_counter(out_of_time), by = .(user_id, session_count)]
+
+
+# Apply the seq. oo time function
+all_logs <- all_logs %>%
+  mutate(out_of_time = replace_na(out_of_time, 0)) %>%
+  .[,
+    ootime_seq := sapply(.SD,
+                         ootime_counter),
+    by = .(user_id,
+           session_count),
+    .SDcols = "out_of_time"] %>%
+  setkeyv(., cols = c("user_id", "created"))
+
+```
+
+
+## Quitting
+
+Users are automatically thrown out of the system if they make three fast mistakes in a row. Here, I am making a variable to detect these cases. 
+```{r fast incorrect, warning=FALSE}
+all_logs[, N := .N, by = .(user_id, session_count)]
+all_logs[, fast_incorrect := NA]
+all_logs[response_in_milliseconds < 3000 & correct_answered == 0, fast_incorrect := 1]
+all_logs[is.na(fast_incorrect), fast_incorrect := 0]
+
+all_logs[, fast_incorrect_counter := ootime_counter(fast_incorrect), by = .(user_id, session_count)]
+
+# View(all_logs[user_id == 665687, .(session_count, item_count, correct_answered, response_in_milliseconds, fast_incorrect, fast_incorrect_counter, counter, seq_fast_incorrect)])
+# View(all_logs[user_id == 492791, .(session_count, item_count, correct_answered, response_in_milliseconds, fast_incorrect, fast_incorrect_counter, counter, seq_fast_incorrect)])
+# all_logs[, fast_incorrect := NA]
+# all_logs[, fast_incorrect_counter := NA]
+# all_logs[, counter := NA]
+table(all_logs$fast_incorrect_counter)
+```
+
+
+
+```{r non-deliberate dummies}
+# Creating dummy variables to find non-deliberate game-play
+
+# any type of quitting
+all_logs[, quit_all := ifelse(item_count < 10 & lead(item_count) == 1, 1, 0)]
+
+# if a session only contains one response, and it was answered within the first 2.5 seconds, it is labelled as a wrong selection (user entered the game accidentally)
+all_logs[, wrong_selection_quit := ifelse(N == 1 & response_in_milliseconds < 2500, 1, 0)]
+all_logs[, wrong_selection_quit2 := ifelse(N == 1 & question_mark == 1 & response_in_milliseconds < 8500, 1, 0)]
+
+# more than three fast incorrect responses 
+all_logs[, speedy_error_quit := ifelse(fast_incorrect_counter >= 3 & lead(item_count) == 1, 1, 0)]
+all_logs[speedy_error_quit == 1 & item_count == 10, quit_all := 1] # Speedy error quits sometimes occur on the 10th item; counting them as quit here so that the quit_all variable is correct (I want it to include all deliberate and non-deliberate quits)
+
+# if the user is thrown out of the system for taking too long to respond to the items (2 or more out of time responses in a row)
+all_logs[, inactivity_quit := ifelse(N < 10 & lead(item_count) == 1 & ootime_seq >= 2, 1, 0)]
+
+# All other quits are counted as deliberate quits 
+all_logs[wrong_selection_quit == 0 & wrong_selection_quit2 == 0 & speedy_error_quit == 0 & inactivity_quit == 0, 
+         quit := ifelse(item_count < 10 & lead(item_count) == 1, 1, 0)]
+
+# Non-deliberate variable (collapsing dummy variables into 1)
+# all_logs[, non_deliberate := ifelse(quit == 0 & quit_all == 1, 1, 0)] # not sure why this does not work
+all_logs[wrong_selection_quit == 1 | wrong_selection_quit2 == 1 | speedy_error_quit == 1 | inactivity_quit == 1, non_deliberate := 1]
+all_logs[non_deliberate == 1, .N] - all_logs[wrong_selection_quit == 1 | wrong_selection_quit2 == 1 | speedy_error_quit == 1 | inactivity_quit == 1, .N]
+
+# Mean quit rates for each dummy variable should be (close to) 1
+all_logs[, mean(quit_all, na.rm = TRUE), by = .(wrong_selection_quit, wrong_selection_quit2, speedy_error_quit, inactivity_quit)]
+```
+
+```{r quit_type}
+# Collapsing dummy variables into one quit_type variable
+# Create a factor variable 'quit_type'
+all_logs[, quit_type := case_when(
+  quit == 1 ~ "Quit",
+  wrong_selection_quit == 1 | wrong_selection_quit2 == 1 ~ "Wrong Sel. Quit",
+  speedy_error_quit == 1 ~ "Speedy Error Quit",
+  inactivity_quit == 1 ~ "Inactivity Quit",
+  TRUE ~ "No Quit"
+)]
+
+# Check that the variable is collapsed correctly
+# table(all_logs$quit_type)
+# all_logs[wrong_selection_quit == 1 | wrong_selection_quit2 == 1, .N]
+# all_logs[speedy_error_quit == 1, .N]
+# all_logs[inactivity_quit == 1, .N]
+# all_logs[quit == 1, .N]
+
+all_logs[, c("wrong_selection_quit", "wrong_selection_quit2", "speedy_error_quit", "inactivity_quit", "quit_all", "quit") := NULL]
+
+# Final quit variable
+all_logs[, quit := ifelse(quit_type == "Quit", 1, 0)]
+table(all_logs$quit_type)
+
+mean_quit_rates <- all_logs[, mean(quit, na.rm = T), by = "user_id"]
+hist(mean_quit_rates$V1, 
+     breaks = seq(min(mean_quit_rates$V1) - 0.01, max(mean_quit_rates$V1) + 0.01, by = 0.01), 
+     main =  "Histogram of Average Quit Rates Across Users, Addition", 
+     col = adjustcolor("turquoise4", alpha.f = 0.5), 
+     border = "turquoise4",
+     density = 30, 
+     xlab = "Average Quit Rate per User")
+```
+
+
+# Cleaning
+
+```{r Cleaning}
+# Filter users who have less than 10 observations
+all_logs <- all_logs[, if (.N >= 10) .SD, by = user_id]
+
+# Keep only users in grade 1-8.
+all_logs <- all_logs[grade <= 8, ]
+
+
+# Reorganize columns
+all_logs <- all_logs[, .(
+  # User-specific variables 
+  created, date, time, user_id, grade, new_user,
+  
+  # Item- and session_count-specific variables 
+  difficulty, show_coins, session, user_session_count, session_count, item_count,  
+  
+  # Response-specific variables 
+  correct_answered, correct_answered_NA, response_in_milliseconds, out_of_time, question_mark, non_deliberate,
+  
+  # Computed variables
+  user_rating, 
+  ootime_seq, fast_incorrect_counter, error_seq, error_seq_excl, error_seq_cat,
+  quit, quit_type, N
+  
+  )]
+
+# Final data
+head(all_logs)
+```
+
+# Save dataset to directory 
+
+```{r Save}
+saveRDS(all_logs, file = "~/research-collaboration/quitting_ind_differences/data/subtraction/subtraction_clean.RData")
+```
