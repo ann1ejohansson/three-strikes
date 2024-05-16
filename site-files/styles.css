@@ -113,7 +113,7 @@ section {
 }
 
 /* Figures section styles */
-.gallery-section {
+section.gallery-section {
   background-color:'white' 
 }
 
