@@ -116,6 +116,7 @@ section {
 .gallery {
   display: flex;
   flex-wrap: wrap;
+  background-color:'white' 
 }
 
 .gallery-item {
