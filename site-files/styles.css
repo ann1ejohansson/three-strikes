@@ -113,6 +113,10 @@ section {
 }
 
 /* Figures section styles */
+section.gallery-section {
+  background-color:'white' 
+}
+
 .gallery {
   display: flex;
   flex-wrap: wrap;
