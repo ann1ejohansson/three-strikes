@@ -1,7 +1,8 @@
 # Welcome to the repository for: 
 ## Three strikes and Who is Out? Individual Differences in Error-Induced Quitting
 
-Project completed April, 2024  
+Project completed June, 2024  
+[Link to preprint](https://osf.io/preprints/psyarxiv/6tduv). 
 
 Annie Johansson  
 University of Amsterdam  
